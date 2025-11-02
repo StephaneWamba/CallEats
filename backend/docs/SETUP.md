@@ -56,14 +56,17 @@ Run the SQL migrations in order using Supabase SQL Editor:
 
 1. **Open SQL Editor** in Supabase Dashboard
 2. Run migrations in this order:
+
    - `supabase/migrations/000_clean_schema.sql` - Core schema (tables, indexes, functions)
    - `supabase/migrations/015_fix_service_role_policies.sql` - RLS policies
    - `supabase/migrations/016_add_phone_mapping_table.sql` - Phone mappings
    - `supabase/migrations/017_add_cost_to_call_history.sql` - Call cost tracking
-   - `supabase/migrations/018_add_users_table.sql` - User authentication (JWT) - **Note**: If `017_add_users_table.sql` exists, skip it (use 018 only)
+   - `supabase/migrations/018_add_users_table.sql` - User authentication (JWT)
    - `supabase/migrations/019_menu_item_modifiers.sql` - Modifier linking (junction table)
    - `supabase/migrations/020_delivery_zones_geometry.sql` - PostGIS for zone boundaries (auto-enables PostGIS extension)
    - `supabase/migrations/021_categories_table.sql` - Category management
+
+   **Important**: If `017_add_users_table.sql` exists, **skip it** - use `018_add_users_table.sql` instead. The `017_add_cost_to_call_history.sql` file is different and should be run.
 
 **Note**: `999_drop_all_tables.sql` is only for complete database reset during development.
 
@@ -163,28 +166,146 @@ This script:
 
 ## Step 9: Create Restaurant and Assign Phone
 
-Phone numbers are automatically assigned when creating restaurants via API:
+Create a restaurant with automatic phone assignment:
 
 ```bash
 curl -X POST http://localhost:8000/api/restaurants \
   -H "Content-Type: application/json" \
-  -H "X-Vapi-Secret: your_secret" \
+  -H "X-Vapi-Secret: $VAPI_SECRET_KEY" \
   -d '{
     "name": "My Restaurant",
     "assign_phone": true
   }'
 ```
 
-**Note**: Use frontend application or API endpoints to manage restaurants, menu items, categories, modifiers, and delivery zones. All data operations automatically trigger embedding generation.
+**Save the response** - it contains `restaurant_id` and `phone_number`. Example response:
 
-## Step 10: Test Voice Call
+```json
+{
+  "id": "abc-123-def-456",
+  "name": "My Restaurant",
+  "api_key": "api_key_...",
+  "phone_number": "+19014994418",
+  "created_at": "2025-01-01T12:00:00Z"
+}
+```
 
-1. Go to Vapi Dashboard → Your Assistant
-2. Click **Test Call**
-3. Ask: "What's on your menu?"
-4. Check backend logs: `docker-compose logs -f api`
+If `phone_number` is `null`, see [Troubleshooting: Phone Assignment Fails](#phone-assignment-fails) below.
+
+**Set environment variable** for convenience:
+
+```bash
+export RESTAURANT_ID="abc-123-def-456"  # Use your actual restaurant ID
+export PHONE_NUMBER="+19014994418"      # Use your actual phone number
+```
+
+## Step 10: Add Sample Menu Data
+
+The assistant needs menu data to answer questions. Add sample menu items:
+
+```bash
+# Create a category (optional but recommended)
+curl -X POST http://localhost:8000/api/restaurants/$RESTAURANT_ID/categories \
+  -H "Content-Type: application/json" \
+  -H "X-Vapi-Secret: $VAPI_SECRET_KEY" \
+  -d '{
+    "name": "Main Courses",
+    "description": "Our delicious main dishes",
+    "display_order": 0
+  }'
+```
+
+```bash
+# Add menu items
+curl -X POST http://localhost:8000/api/restaurants/$RESTAURANT_ID/menu-items \
+  -H "Content-Type: application/json" \
+  -H "X-Vapi-Secret: $VAPI_SECRET_KEY" \
+  -d '{
+    "name": "Grilled Salmon",
+    "description": "Fresh Atlantic salmon with lemon butter sauce",
+    "price": 24.99,
+    "available": true
+  }'
+
+curl -X POST http://localhost:8000/api/restaurants/$RESTAURANT_ID/menu-items \
+  -H "Content-Type: application/json" \
+  -H "X-Vapi-Secret: $VAPI_SECRET_KEY" \
+  -d '{
+    "name": "Beef Burger",
+    "description": "Classic burger with fries",
+    "price": 15.99,
+    "available": true
+  }'
+```
+
+**Note**: Embeddings are generated automatically in the background. Wait 30-60 seconds for processing.
+
+## Step 11: Verify Embeddings Generated (Optional but Recommended)
+
+Check that embeddings were created for your menu items:
+
+```bash
+# Manually trigger embedding generation if needed
+curl -X POST http://localhost:8000/api/embeddings/generate \
+  -H "Content-Type: application/json" \
+  -H "X-Vapi-Secret: $VAPI_SECRET_KEY" \
+  -d '{
+    "restaurant_id": "'$RESTAURANT_ID'",
+    "category": "menu"
+  }'
+```
+
+Check backend logs to confirm:
+
+```bash
+docker-compose logs api | grep -i embedding
+```
+
+## Step 12: Make a Real Phone Call
+
+**Call your restaurant's phone number** from your mobile phone:
+
+1. **Dial the phone number** (e.g., `+19014994418`)
+2. **Ask questions** like:
+   - "What's on your menu?"
+   - "What dishes do you have?"
+   - "Tell me about your salmon"
+   - "What are your prices?"
+3. **Listen to the assistant** respond with your menu items
+
+**Monitor the call** in real-time:
+
+```bash
+# Watch backend logs during the call
+docker-compose logs -f api
+```
+
+## Step 13: Verify Call History
+
+After the call ends, wait 30-60 seconds for data to be captured (webhook fallback mechanism), then check call history:
+
+```bash
+# List recent calls
+curl -X GET "http://localhost:8000/api/calls?restaurant_id=$RESTAURANT_ID" \
+  -H "X-Vapi-Secret: $VAPI_SECRET_KEY"
+```
+
+The response should include:
+
+- Call transcript (`messages` array)
+- Duration and timestamps
+- Outcome and cost
+
+**Success!** You now have a working voice assistant. The assistant can:
+
+- Answer questions about menu items
+- Provide prices and descriptions
+- Handle delivery zone inquiries
+- Respond to operating hours questions
 
 ## Troubleshooting
+
+For detailed Vapi API troubleshooting, see [Vapi Troubleshooting Guide](VAPI_TROUBLESHOOTING.md).
 
 ### Backend Not Accessible
 
@@ -213,7 +334,7 @@ curl -X POST http://localhost:8000/api/restaurants \
 - Ensure pgvector extension is enabled
 - Ensure PostGIS extension is enabled (for delivery zones)
 
-### Phone Assignment Fails
+### Phone Assignment Fails {#phone-assignment-fails}
 
 - **Restaurant still created**: Phone assignment failure doesn't prevent restaurant creation
 - Check `VAPI_API_KEY` and `PUBLIC_BACKEND_URL` are set
@@ -234,3 +355,4 @@ curl -X POST http://localhost:8000/api/restaurants \
 - Read [Architecture](ARCHITECTURE.md) to understand the system design
 - Review [API Reference](API.md) for endpoint documentation
 - Check [Phone Number Automation](PHONE_NUMBER_AUTOMATION.md) for phone provisioning details
+- See [Vapi Troubleshooting](VAPI_TROUBLESHOOTING.md) for known Vapi API issues and solutions
