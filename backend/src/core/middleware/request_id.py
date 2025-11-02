@@ -20,9 +20,8 @@ class RequestIDMiddleware(BaseHTTPMiddleware):
         request.state.request_id = request_id
 
         logger.info(
-            f"Request {request.method} {request.url.path}",
-            extra={"request_id": request_id,
-                   "method": request.method, "path": request.url.path}
+            f"{request.method} {request.url.path}",
+            extra={"request_id": request_id}
         )
 
         response = await call_next(request)

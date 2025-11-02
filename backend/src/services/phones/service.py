@@ -2,9 +2,9 @@
 from typing import Optional
 import os
 import logging
-from vapi.manager import VapiResourceManager
-from src.services.phone_mapping import create_phone_mapping, get_restaurant_id_from_phone
-from src.services.twilio_service import create_and_assign_twilio_phone
+from src.services.vapi.manager import VapiResourceManager
+from src.services.phones.mapping import create_phone_mapping, get_restaurant_id_from_phone
+from src.services.phones.twilio import create_and_assign_twilio_phone
 
 logger = logging.getLogger(__name__)
 

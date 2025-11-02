@@ -7,9 +7,9 @@ All endpoints require authentication via X-Vapi-Secret header.
 from fastapi import APIRouter, HTTPException, Header
 from typing import Optional
 from src.models.embeddings import GenerateEmbeddingsRequest, CacheInvalidateRequest
-from src.services.embedding_service import generate_embeddings_for_restaurant
-from src.services.cache import clear_cache
-from src.services.auth import verify_vapi_secret
+from src.services.embeddings.service import generate_embeddings_for_restaurant
+from src.services.infrastructure.cache import clear_cache
+from src.services.infrastructure.auth import verify_vapi_secret
 import logging
 
 router = APIRouter()

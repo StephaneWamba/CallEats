@@ -1,12 +1,11 @@
 """
-Vapi setup and management module.
+Vapi configuration module.
 
-Provides utilities for configuring and managing Vapi assistants, tools, and resources.
+Contains configuration loader and YAML config files.
+Vapi client and manager moved to src.services.vapi.
 """
 
-from .client import VapiClient
 from .config_loader import load_config, validate_config
-from .manager import VapiResourceManager
 
-__all__ = ["VapiClient", "load_config", "validate_config", "VapiResourceManager"]
+__all__ = ["load_config", "validate_config"]
 

@@ -1,9 +1,9 @@
 """Service for menu items management."""
 from typing import List, Dict, Any, Optional
 from decimal import Decimal
-from src.services.supabase_client import get_supabase_service_client
-from src.services.embedding_service import generate_embedding
-from src.services.cache import clear_cache
+from src.services.infrastructure.database import get_supabase_service_client
+from src.services.embeddings.service import generate_embedding
+from src.services.infrastructure.cache import clear_cache
 import logging
 import asyncio
 

@@ -11,9 +11,9 @@ Complete reset and test script.
    - Test voice call flow
 """
 import asyncio
-from src.services.embedding_service import generate_embeddings_for_restaurant
-from vapi.manager import VapiResourceManager
-from src.services.supabase_client import get_supabase_service_client
+from src.services.embeddings.service import generate_embeddings_for_restaurant
+from src.services.vapi.manager import VapiResourceManager
+from src.services.infrastructure.database import get_supabase_service_client
 import os
 import sys
 from pathlib import Path
@@ -75,7 +75,7 @@ restaurant_name = "Test Restaurant"
 
 try:
     from uuid import uuid4
-    from src.services.phone_service import assign_phone_to_restaurant
+    from src.services.phones.service import assign_phone_to_restaurant
 
     api_key_str = f"api_key_{uuid4().hex[:16]}"
     result = supabase.table("restaurants").insert({

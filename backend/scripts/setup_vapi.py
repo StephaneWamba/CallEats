@@ -8,7 +8,7 @@ from pathlib import Path
 import argparse
 import sys
 import os
-from vapi.manager import VapiResourceManager
+from src.services.vapi.manager import VapiResourceManager
 
 
 # Add backend root to path for vapi imports

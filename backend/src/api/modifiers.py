@@ -11,16 +11,16 @@ from src.models.modifiers import (
     CreateModifierRequest,
     UpdateModifierRequest
 )
-from src.services.modifiers_service import (
+from src.services.menu.modifiers import (
     list_modifiers,
     get_modifier,
     create_modifier,
     update_modifier,
     delete_modifier
 )
-from src.services.auth import verify_vapi_secret
-from src.services.embedding_service import add_embedding_task
-from src.middleware.request_id import get_request_id
+from src.services.infrastructure.auth import verify_vapi_secret
+from src.services.embeddings.service import add_embedding_task
+from src.core.middleware.request_id import get_request_id
 import logging
 
 router = APIRouter()
@@ -127,9 +127,9 @@ def create_modifier_endpoint(
             description=request.description,
             price=request.price
         )
-        
+
         add_embedding_task(background_tasks, restaurant_id, "modifiers")
-        
+
         return ModifierResponse(**item)
     except Exception as e:
         request_id = get_request_id(http_request)
@@ -177,9 +177,9 @@ def update_modifier_endpoint(
         if not item:
             raise HTTPException(
                 status_code=404, detail="Modifier not found")
-        
+
         add_embedding_task(background_tasks, restaurant_id, "modifiers")
-        
+
         return ModifierResponse(**item)
     except HTTPException:
         raise
@@ -221,9 +221,9 @@ def delete_modifier_endpoint(
         if not deleted:
             raise HTTPException(
                 status_code=404, detail="Modifier not found")
-        
+
         add_embedding_task(background_tasks, restaurant_id, "modifiers")
-        
+
         return {"success": True, "message": "Modifier deleted"}
     except HTTPException:
         raise
@@ -236,4 +236,3 @@ def delete_modifier_endpoint(
         )
         raise HTTPException(
             status_code=500, detail="Failed to delete modifier")
-

@@ -11,7 +11,7 @@ Creates a restaurant and seeds it with sample data:
 Optionally generates embeddings for all data.
 """
 
-from src.services.supabase_client import get_supabase_service_client
+from src.services.infrastructure.database import get_supabase_service_client
 import os
 import sys
 import argparse

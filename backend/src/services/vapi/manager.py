@@ -6,8 +6,8 @@ Provides high-level operations for managing Vapi resources using configuration f
 
 from typing import Dict, Any, List, Optional
 import logging
-from .client import VapiClient, VapiAPIError
-from .config_loader import load_config, validate_config
+from src.services.vapi.client import VapiClient, VapiAPIError
+from vapi.config_loader import load_config, validate_config
 
 logger = logging.getLogger(__name__)
 

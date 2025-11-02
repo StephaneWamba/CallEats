@@ -1,8 +1,8 @@
 """Service for health check operations."""
 from typing import Dict
 from datetime import datetime
-from src.services.supabase_client import get_supabase_service_client
-from src.config import get_settings
+from src.services.infrastructure.database import get_supabase_service_client
+from src.core.config import get_settings
 import logging
 
 logger = logging.getLogger(__name__)
@@ -44,7 +44,7 @@ async def check_vapi() -> Dict:
     """Check Vapi API connectivity and measure latency."""
     try:
         import os
-        from vapi.client import VapiClient
+        from src.services.vapi.client import VapiClient
 
         api_key = os.environ.get("VAPI_API_KEY")
         if not api_key:

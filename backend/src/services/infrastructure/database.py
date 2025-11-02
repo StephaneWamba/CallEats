@@ -1,6 +1,6 @@
 import os
 from supabase import create_client, Client
-from src.config import get_settings
+from src.core.config import get_settings
 from functools import lru_cache
 
 

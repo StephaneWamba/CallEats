@@ -34,7 +34,7 @@ SUPABASE_URL=https://coeetmhcivmcxgrhsoty.supabase.co
 
 **Used by:**
 
-- `src/services/supabase_client.py` - Database connection
+- `src/services/infrastructure/database.py` - Database connection
 
 ---
 
@@ -51,7 +51,7 @@ Supabase anonymous key for read operations. Subject to Row Level Security (RLS) 
 
 **Used by:**
 
-- `src/services/supabase_client.py` - `get_supabase_client()` function
+- `src/services/infrastructure/database.py` - `get_supabase_client()` function
 - Also used as fallback if `SUPABASE_SERVICE_ROLE_KEY` is not set
 
 ---
@@ -69,7 +69,7 @@ Supabase service role key that bypasses RLS. Used for admin operations and write
 
 **Used by:**
 
-- `src/services/supabase_client.py` - `get_supabase_service_client()` function
+- `src/services/infrastructure/database.py` - `get_supabase_service_client()` function
 - All write operations (inserts, updates, deletes)
 
 ---
@@ -87,7 +87,7 @@ OpenAI API key for generating embeddings. Requires billing-enabled account.
 
 **Used by:**
 
-- `src/services/embedding_service.py` - Embedding generation
+- `src/services/embeddings/service.py` - Embedding generation
 
 ---
 
@@ -102,8 +102,8 @@ Vapi API key for programmatic access to Vapi resources (assistants, tools, phone
 
 **Used by:**
 
-- `vapi/client.py` - Vapi API client
-- `src/services/phone_service.py` - Phone assignment
+- `src/services/vapi/client.py` - Vapi API client
+- `src/services/phones/service.py` - Phone assignment
 - `scripts/setup_vapi.py` - Assistant/tool creation
 
 ---
@@ -121,7 +121,7 @@ Vapi webhook secret for authenticating webhook requests from Vapi.
 
 **Used by:**
 
-- `src/services/auth.py` - `verify_vapi_secret()` function
+- `src/services/infrastructure/auth.py` - `verify_vapi_secret()` function
 - All `/api/vapi/*` endpoints
 
 ---
@@ -148,8 +148,8 @@ Public URL where your backend API is accessible. This is used by Vapi to make we
 
 **Used by:**
 
-- `vapi/manager.py` - Tool server URL configuration
-- `src/services/phone_service.py` - Phone service initialization
+- `src/services/vapi/manager.py` - Tool server URL configuration
+- `src/services/phones/service.py` - Phone service initialization
 - `scripts/setup_vapi.py` - Vapi setup
 
 ---
@@ -165,7 +165,7 @@ Twilio Account SID for automatic phone number provisioning.
 
 **Used by:**
 
-- `src/services/twilio_service.py` - Twilio API calls
+- `src/services/phones/twilio.py` - Twilio API calls
 - `scripts/create_twilio_phone_numbers.py` - Batch phone creation
 
 **Note**: Only required if you want automatic Twilio phone number creation. Without this, the system will only use existing unassigned phones or Vapi free numbers.
@@ -185,7 +185,7 @@ Twilio Auth Token for authenticating Twilio API requests.
 
 **Used by:**
 
-- `src/services/twilio_service.py` - Twilio API calls
+- `src/services/phones/twilio.py` - Twilio API calls
 - `scripts/create_twilio_phone_numbers.py` - Batch phone creation
 
 **Note**: Required together with `TWILIO_ACCOUNT_SID` for automatic phone provisioning.
@@ -205,7 +205,8 @@ Environment type used for:
 
 **Used by:**
 
-- `src/main.py` - Logging configuration and error handling
+- `src/core/logging_config.py` - Logging configuration
+- `src/main.py` - Error handling
 
 **Example:**
 

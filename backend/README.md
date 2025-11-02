@@ -78,12 +78,24 @@ See [API Reference](docs/API.md) for complete documentation.
 ```
 backend/
 ├── src/                    # Application code
+│   ├── core/              # Core infrastructure
+│   │   ├── config.py       # Configuration
+│   │   ├── logging_config.py  # Logging setup
+│   │   └── middleware/     # Request tracking
 │   ├── api/               # FastAPI routes
 │   ├── models/            # Pydantic models
-│   └── services/          # Business logic
-├── vapi/                  # Vapi integration
-│   ├── client.py          # Vapi API client
-│   ├── manager.py         # Resource manager
+│   │   └── vapi/          # Vapi-specific models
+│   └── services/          # Business logic (organized by domain)
+│       ├── restaurants/   # Restaurant services
+│       ├── menu/           # Menu services
+│       ├── operations/     # Operations services
+│       ├── calls/          # Call services
+│       ├── phones/         # Phone services
+│       ├── vapi/           # Vapi services
+│       ├── embeddings/     # Embedding services
+│       └── infrastructure/ # Core services (cache, database, auth)
+├── vapi/                  # Vapi configuration
+│   ├── config_loader.py   # YAML config loader
 │   └── config/            # YAML configurations
 ├── scripts/               # Utility scripts
 │   ├── setup_vapi.py      # Vapi assistant/tools setup

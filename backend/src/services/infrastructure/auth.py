@@ -3,7 +3,7 @@ Authentication utilities for API endpoints.
 """
 from fastapi import HTTPException
 from typing import Optional
-from src.config import get_settings
+from src.core.config import get_settings
 
 
 def verify_vapi_secret(x_vapi_secret: Optional[str]) -> None:

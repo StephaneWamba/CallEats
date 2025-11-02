@@ -7,7 +7,7 @@ including listing call history and creating new call entries.
 from fastapi import APIRouter, HTTPException, Header, Query
 from typing import Optional
 from src.models.calls import CreateCallRequest
-from src.services.call_service import list_calls as list_calls_service, create_call as create_call_service
+from src.services.calls.service import list_calls as list_calls_service, create_call as create_call_service
 import logging
 
 router = APIRouter()

@@ -14,29 +14,15 @@ from src.api.menu_items import router as menu_items_router
 from src.api.modifiers import router as modifiers_router
 from src.api.operating_hours import router as operating_hours_router
 from src.api.delivery_zones import router as delivery_zones_router
-from src.config import get_settings
-from src.middleware.request_id import RequestIDMiddleware, get_request_id
+from src.core.config import get_settings
+from src.core.middleware.request_id import RequestIDMiddleware, get_request_id
+from src.core.logging_config import configure_logging
 import logging
-import sys
 
 settings = get_settings()
 
-log_level = logging.DEBUG if settings.environment == "development" else logging.INFO
-
-
-class RequestIDFormatter(logging.Formatter):
-    """Custom formatter that handles request_id in log records."""
-
-    def format(self, record):
-        request_id = getattr(record, 'request_id', 'N/A')
-        record.request_id = request_id
-        return super().format(record)
-
-
-handler = logging.StreamHandler(sys.stdout)
-handler.setFormatter(RequestIDFormatter(
-    '%(asctime)s - [%(name)s] [request_id=%(request_id)s] - %(levelname)s - %(message)s'))
-logging.basicConfig(level=log_level, handlers=[handler])
+# Configure logging on application startup
+configure_logging()
 
 app = FastAPI(
     title="Restaurant Voice Assistant API",

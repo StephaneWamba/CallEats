@@ -1,6 +1,6 @@
 from openai import AsyncOpenAI
-from src.config import get_settings
-from src.services.supabase_client import get_supabase_client, get_supabase_service_client
+from src.core.config import get_settings
+from src.services.infrastructure.database import get_supabase_client, get_supabase_service_client
 from typing import Optional
 import logging
 

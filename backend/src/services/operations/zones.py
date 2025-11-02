@@ -1,8 +1,8 @@
 """Service for delivery zones management."""
 from typing import List, Dict, Any, Optional
 from decimal import Decimal
-from src.services.supabase_client import get_supabase_service_client
-from src.services.cache import clear_cache
+from src.services.infrastructure.database import get_supabase_service_client
+from src.services.infrastructure.cache import clear_cache
 import logging
 
 logger = logging.getLogger(__name__)
@@ -106,9 +106,9 @@ def create_delivery_zone(
             raise Exception("Failed to create delivery zone")
 
         zone = resp.data[0]
-        
+
         clear_cache(restaurant_id, "zones")
-        
+
         return zone
     except Exception as e:
         logger.error(
@@ -200,4 +200,3 @@ def delete_delivery_zone(restaurant_id: str, zone_id: str) -> bool:
         logger.error(
             f"Error deleting delivery zone {zone_id} for restaurant_id={restaurant_id}: {e}", exc_info=True)
         raise
-

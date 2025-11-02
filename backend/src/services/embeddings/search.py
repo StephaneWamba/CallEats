@@ -5,9 +5,9 @@ Performs semantic search using pgvector against restaurant-specific
 document embeddings with automatic caching and tenant isolation.
 """
 from typing import Optional, List, Dict, Any
-from src.services.supabase_client import get_supabase_client
-from src.services.embedding_service import generate_embedding
-from src.services.cache import get_cached_result, set_cached_result
+from src.services.infrastructure.database import get_supabase_client
+from src.services.embeddings.service import generate_embedding
+from src.services.infrastructure.cache import get_cached_result, set_cached_result
 import logging
 
 logger = logging.getLogger(__name__)
@@ -36,8 +36,12 @@ async def search_knowledge_base(
     """
     cached = get_cached_result(restaurant_id, query, category)
     if cached is not None:
+        logger.debug(
+            f"Cache hit for query: '{query[:50]}...' (restaurant={restaurant_id}, category={category})")
         return cached
 
+    logger.debug(
+        f"Cache miss, generating embedding for query: '{query[:50]}...'")
     query_embedding = await generate_embedding(query)
 
     rpc_params = {
@@ -61,6 +65,10 @@ async def search_knowledge_base(
         for doc in response.data
     ]
 
+    logger.info(
+        f"Vector search: {len(results)} results for query='{query[:50]}...' "
+        f"(restaurant={restaurant_id}, category={category})"
+    )
     set_cached_result(restaurant_id, query, results, category)
 
     return results

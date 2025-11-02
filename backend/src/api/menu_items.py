@@ -11,16 +11,16 @@ from src.models.menu_items import (
     CreateMenuItemRequest,
     UpdateMenuItemRequest
 )
-from src.services.menu_service import (
+from src.services.menu.items import (
     list_menu_items,
     get_menu_item,
     create_menu_item,
     update_menu_item,
     delete_menu_item
 )
-from src.services.auth import verify_vapi_secret
-from src.services.embedding_service import add_embedding_task
-from src.middleware.request_id import get_request_id
+from src.services.infrastructure.auth import verify_vapi_secret
+from src.services.embeddings.service import add_embedding_task
+from src.core.middleware.request_id import get_request_id
 import logging
 
 router = APIRouter()

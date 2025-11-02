@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Delete existing Twilio phone number from Vapi."""
-from src.services.supabase_client import get_supabase_service_client
-from vapi.client import VapiClient
+from src.services.infrastructure.database import get_supabase_service_client
+from src.services.vapi.client import VapiClient
 import os
 import sys
 from pathlib import Path

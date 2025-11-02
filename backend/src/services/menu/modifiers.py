@@ -1,8 +1,8 @@
 """Service for modifiers management."""
 from typing import List, Dict, Any, Optional
 from decimal import Decimal
-from src.services.supabase_client import get_supabase_service_client
-from src.services.cache import clear_cache
+from src.services.infrastructure.database import get_supabase_service_client
+from src.services.infrastructure.cache import clear_cache
 import logging
 
 logger = logging.getLogger(__name__)
@@ -100,9 +100,9 @@ def create_modifier(
             raise Exception("Failed to create modifier")
 
         modifier = resp.data[0]
-        
+
         clear_cache(restaurant_id, "modifiers")
-        
+
         return modifier
     except Exception as e:
         logger.error(
@@ -190,4 +190,3 @@ def delete_modifier(restaurant_id: str, modifier_id: str) -> bool:
         logger.error(
             f"Error deleting modifier {modifier_id} for restaurant_id={restaurant_id}: {e}", exc_info=True)
         raise
-

@@ -1,6 +1,6 @@
 from cachetools import TTLCache
 from typing import Optional
-from src.config import get_settings
+from src.core.config import get_settings
 
 settings = get_settings()
 

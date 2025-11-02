@@ -1,8 +1,8 @@
 """Service for restaurant management."""
 from typing import Optional, Dict, Any
 from uuid import uuid4
-from src.services.supabase_client import get_supabase_service_client
-from src.services.phone_service import assign_phone_to_restaurant
+from src.services.infrastructure.database import get_supabase_service_client
+from src.services.phones.service import assign_phone_to_restaurant
 import logging
 
 logger = logging.getLogger(__name__)
@@ -87,17 +87,18 @@ def get_restaurant(restaurant_id: str) -> Optional[Dict[str, Any]]:
             return None
 
         restaurant_data = resp.data[0]
-        
+
         phone_number = None
         try:
             phone_mappings = supabase.table("restaurant_phone_mappings").select(
                 "phone_number"
             ).eq("restaurant_id", restaurant_id).limit(1).execute()
-            
+
             if phone_mappings.data:
                 phone_number = phone_mappings.data[0].get("phone_number")
         except Exception as e:
-            logger.warning(f"Error fetching phone mapping for restaurant {restaurant_id}: {e}")
+            logger.warning(
+                f"Error fetching phone mapping for restaurant {restaurant_id}: {e}")
 
         return {
             "id": restaurant_data["id"],
@@ -147,17 +148,18 @@ def update_restaurant(
             return None
 
         restaurant_data = resp.data[0]
-        
+
         phone_number = None
         try:
             phone_mappings = supabase.table("restaurant_phone_mappings").select(
                 "phone_number"
             ).eq("restaurant_id", restaurant_id).limit(1).execute()
-            
+
             if phone_mappings.data:
                 phone_number = phone_mappings.data[0].get("phone_number")
         except Exception as e:
-            logger.warning(f"Error fetching phone mapping for restaurant {restaurant_id}: {e}")
+            logger.warning(
+                f"Error fetching phone mapping for restaurant {restaurant_id}: {e}")
 
         return {
             "id": restaurant_data["id"],
@@ -171,4 +173,3 @@ def update_restaurant(
         logger.error(
             f"Error updating restaurant {restaurant_id}: {e}", exc_info=True)
         raise
-

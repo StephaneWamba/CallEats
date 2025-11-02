@@ -15,17 +15,17 @@ graph TB
     API --> PhoneService[Phone Service]
     API --> VectorSearch[Vector Search Service]
     API --> EmbeddingService[Embedding Service]
-    
+
     Vapi --> Backend[FastAPI Backend<br/>/api/vapi/*]
     Backend --> PhoneMapping[Phone Mapping Service]
     Backend --> VectorSearch
     Backend --> Cache[Cache Layer<br/>TTL: 60s]
-    
+
     VectorSearch --> Supabase[(Supabase PostgreSQL<br/>+ pgvector)]
     EmbeddingService --> OpenAI[OpenAI Embeddings API]
     PhoneService --> Twilio[Twilio API]
     PhoneService --> VapiClient[Vapi API Client]
-    
+
     Supabase --> Restaurants[restaurants table]
     Supabase --> Embeddings[document_embeddings<br/>with vector column]
     Supabase --> PhoneMappingTable[restaurant_phone_mappings]
@@ -45,7 +45,7 @@ sequenceDiagram
     participant B as Backend API
     participant P as Phone Mapping
     participant D as Database
-    
+
     C->>V: Calls phone number
     V->>B: POST /api/vapi/assistant-request<br/>(phone number in metadata)
     B->>P: get_restaurant_id_from_phone()
@@ -53,7 +53,7 @@ sequenceDiagram
     D-->>P: restaurant_id
     P-->>B: restaurant_id
     B-->>V: {metadata: {restaurant_id}}
-    
+
     C->>V: "What's on your menu?"
     V->>B: POST /api/vapi/knowledge-base<br/>(with restaurant_id in metadata)
     B->>D: Vector search with restaurant_id filter
@@ -75,16 +75,16 @@ sequenceDiagram
     participant VS as Vector Search
     participant S as Supabase
     participant O as OpenAI
-    
+
     C->>V: Calls +1234567890
     V->>A: POST /api/vapi/assistant-request<br/>{phoneNumber: "+1234567890"}
     A->>S: Lookup phone → restaurant_id
     S-->>A: restaurant_id: "abc-123"
     A-->>V: {metadata: {restaurant_id: "abc-123"}}
-    
+
     C->>V: "What are your hours?"
     V->>KB: POST /api/vapi/knowledge-base<br/>Tool: get_hours_info<br/>Query: "hours"<br/>Metadata: {restaurant_id: "abc-123"}
-    
+
     KB->>KB: Extract restaurant_id from metadata
     KB->>VS: search_knowledge_base(query, restaurant_id, category="hours")
     VS->>O: Generate embedding for query
@@ -104,32 +104,32 @@ How phone numbers are assigned to restaurants:
 ```mermaid
 flowchart TD
     Start[POST /api/restaurants<br/>assign_phone=true] --> Check{force_twilio?}
-    
+
     Check -->|false| FindExisting[Find existing<br/>unassigned phones]
     FindExisting --> HasExisting{Phone found?}
-    
+
     HasExisting -->|yes| AssignExisting[Assign existing phone<br/>Create mapping]
     HasExisting -->|no| CheckTwilio{Twilio<br/>configured?}
-    
+
     Check -->|true| CheckTwilio
-    
+
     CheckTwilio -->|yes| GetCredential[Get/Create Twilio<br/>credential in Vapi]
     GetCredential --> ListTwilio[List existing Twilio<br/>numbers]
     ListTwilio --> HasTwilioNumber{Number<br/>exists?}
-    
+
     HasTwilioNumber -->|yes| UseExisting[Use existing Twilio number]
     HasTwilioNumber -->|no| SearchTwilio[Search available<br/>Twilio numbers]
-    
+
     SearchTwilio --> Purchase[Purchase from Twilio API]
     Purchase --> AddToVapi[Add to Vapi with<br/>Twilio credentials]
-    
+
     UseExisting --> AddToVapi
     AddToVapi --> AssignAssistant[Assign to shared assistant]
     AssignAssistant --> CreateMapping[Create phone mapping<br/>in database]
-    
+
     AssignExisting --> Done[Return phone number]
     CreateMapping --> Done
-    
+
     CheckTwilio -->|no| ReturnNone[Return None<br/>No phone assigned]
 ```
 
@@ -146,20 +146,20 @@ erDiagram
     restaurants ||--o{ document_embeddings : has
     restaurants ||--o{ restaurant_phone_mappings : has
     restaurants ||--o{ call_history : has
-    
+
     restaurants {
         uuid id PK
         string name
         string api_key
         timestamp created_at
     }
-    
+
     restaurant_phone_mappings {
         string phone_number PK
         uuid restaurant_id FK
         timestamp created_at
     }
-    
+
     document_embeddings {
         uuid id PK
         uuid restaurant_id FK
@@ -168,7 +168,7 @@ erDiagram
         string category
         jsonb metadata
     }
-    
+
     menu_items {
         uuid id PK
         uuid restaurant_id FK
@@ -176,7 +176,7 @@ erDiagram
         text description
         decimal price
     }
-    
+
     operating_hours {
         uuid id PK
         uuid restaurant_id FK
@@ -196,6 +196,21 @@ erDiagram
 - Global exception handling
 - Route registration
 
+### Core Infrastructure (`src/core/`)
+
+- **config.py**: Application configuration
+- **logging_config.py**:
+  - **Custom Formatter**: RequestIDFormatter with color-coded log levels
+  - **Request Tracking**: Automatic request ID generation and propagation
+  - **Color Coding**:
+    - INFO: Green
+    - WARNING: Yellow
+    - ERROR: Red
+    - DEBUG: Cyan
+  - **Third-Party Suppression**: Verbose logs from external libraries suppressed
+  - **Format**: `LEVEL | [module] [req=id] message`
+- **middleware/request_id.py**: Request ID generation and tracking
+
 ### API Endpoints (`src/api/`)
 
 - **restaurants.py**: Restaurant CRUD, phone assignment
@@ -206,18 +221,31 @@ erDiagram
 
 ### Services (`src/services/`)
 
-- **phone_service.py**: Phone assignment orchestration
-- **phone_mapping.py**: Phone → restaurant_id mapping
-- **twilio_service.py**: Twilio API integration
-- **vector_search.py**: Vector similarity search
-- **embedding_service.py**: OpenAI embeddings generation, background task management
-- **cache.py**: In-memory caching (TTL: 60s)
-- **vapi_response.py**: Vapi response formatting
+Services are organized by domain:
 
-### Vapi Integration (`vapi/`)
+- **restaurants/service.py**: Restaurant CRUD operations
+- **phones/**: Phone management
+  - **service.py**: Phone assignment orchestration
+  - **mapping.py**: Phone → restaurant_id mapping
+  - **twilio.py**: Twilio API integration
+- **embeddings/**: Vector embeddings
+  - **service.py**: OpenAI embeddings generation, background task management
+  - **search.py**: Vector similarity search
+- **calls/**: Call management
+  - **service.py**: Call history CRUD
+  - **webhook.py**: Vapi webhook processing
+- **vapi/**: Vapi integration
+  - **client.py**: Vapi API client wrapper
+  - **manager.py**: Resource manager (tools, assistants)
+  - **response.py**: Vapi response formatting
+- **infrastructure/**: Core infrastructure services
+  - **cache.py**: In-memory caching (TTL: 60s)
+  - **database.py**: Database client (Supabase)
+  - **auth.py**: Authentication/authorization
+  - **health.py**: Health check service
 
-- **client.py**: Vapi API client wrapper
-- **manager.py**: Resource manager (tools, assistants)
+### Vapi Configuration (`vapi/`)
+
 - **config_loader.py**: YAML configuration loader
 - **config/**: Tool and assistant YAML configurations
 
@@ -282,4 +310,3 @@ erDiagram
 - **Database**: Supabase scales PostgreSQL automatically
 - **Caching**: Consider Redis for multi-instance deployments
 - **Phone Limits**: Twilio account quotas apply per restaurant
-

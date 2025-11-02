@@ -10,15 +10,15 @@ from src.models.operating_hours import (
     OperatingHourResponse,
     UpdateOperatingHoursRequest
 )
-from src.services.operating_hours_service import (
+from src.services.operations.hours import (
     list_operating_hours,
     get_operating_hour,
     update_operating_hours,
     delete_operating_hours
 )
-from src.services.auth import verify_vapi_secret
-from src.services.embedding_service import add_embedding_task
-from src.middleware.request_id import get_request_id
+from src.services.infrastructure.auth import verify_vapi_secret
+from src.services.embeddings.service import add_embedding_task
+from src.core.middleware.request_id import get_request_id
 import logging
 
 router = APIRouter()

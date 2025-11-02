@@ -11,16 +11,16 @@ from src.models.delivery_zones import (
     CreateDeliveryZoneRequest,
     UpdateDeliveryZoneRequest
 )
-from src.services.delivery_zones_service import (
+from src.services.operations.zones import (
     list_delivery_zones,
     get_delivery_zone,
     create_delivery_zone,
     update_delivery_zone,
     delete_delivery_zone
 )
-from src.services.auth import verify_vapi_secret
-from src.services.embedding_service import add_embedding_task
-from src.middleware.request_id import get_request_id
+from src.services.infrastructure.auth import verify_vapi_secret
+from src.services.embeddings.service import add_embedding_task
+from src.core.middleware.request_id import get_request_id
 import logging
 
 router = APIRouter()
@@ -128,9 +128,9 @@ def create_delivery_zone_endpoint(
             delivery_fee=request.delivery_fee,
             min_order=request.min_order
         )
-        
+
         add_embedding_task(background_tasks, restaurant_id, "zones")
-        
+
         return DeliveryZoneResponse(**item)
     except Exception as e:
         request_id = get_request_id(http_request)
@@ -179,9 +179,9 @@ def update_delivery_zone_endpoint(
         if not item:
             raise HTTPException(
                 status_code=404, detail="Delivery zone not found")
-        
+
         add_embedding_task(background_tasks, restaurant_id, "zones")
-        
+
         return DeliveryZoneResponse(**item)
     except HTTPException:
         raise
@@ -223,9 +223,9 @@ def delete_delivery_zone_endpoint(
         if not deleted:
             raise HTTPException(
                 status_code=404, detail="Delivery zone not found")
-        
+
         add_embedding_task(background_tasks, restaurant_id, "zones")
-        
+
         return {"success": True, "message": "Delivery zone deleted"}
     except HTTPException:
         raise
@@ -238,4 +238,3 @@ def delete_delivery_zone_endpoint(
         )
         raise HTTPException(
             status_code=500, detail="Failed to delete delivery zone")
-

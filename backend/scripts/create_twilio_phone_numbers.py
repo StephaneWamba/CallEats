@@ -5,10 +5,10 @@ Batch script to create and assign Twilio phone numbers to multiple restaurants.
 For single restaurant creation, use POST /api/restaurants (automatically creates phones).
 This script is for bulk operations on existing restaurants without phones.
 """
-from vapi.client import VapiClient
-from src.services.twilio_service import create_and_assign_twilio_phone
-from src.services.supabase_client import get_supabase_service_client
-from vapi.manager import VapiResourceManager
+from src.services.vapi.client import VapiClient
+from src.services.phones.twilio import create_and_assign_twilio_phone
+from src.services.infrastructure.database import get_supabase_service_client
+from src.services.vapi.manager import VapiResourceManager
 import os
 import sys
 from pathlib import Path

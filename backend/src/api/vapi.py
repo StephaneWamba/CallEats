@@ -8,20 +8,21 @@ for text-to-speech synthesis.
 from fastapi import APIRouter, Request, HTTPException, Header
 from typing import Optional
 from pydantic import ValidationError
-from src.models.vapi import VapiRequest
+from src.models.vapi.requests import VapiRequest
+from src.models.vapi.webhooks import EndOfCallReportRequest
 from src.models.embeddings import CacheInvalidateRequest, GenerateEmbeddingsRequest
-from src.services.vector_search import search_knowledge_base
-from src.services.cache import clear_cache
-from src.config import get_settings
-from src.services.vapi_response import (
+from src.services.embeddings.search import search_knowledge_base
+from src.services.infrastructure.cache import clear_cache
+from src.core.config import get_settings
+from src.services.vapi.response import (
     build_tool_result_with_items,
     build_no_result,
     build_structured_items,
 )
-from src.middleware.request_id import get_request_id
-
-from src.services.embedding_service import generate_embeddings_for_restaurant
-from src.services.auth import verify_vapi_secret
+from src.core.middleware.request_id import get_request_id
+from src.services.calls.webhook import parse_vapi_webhook, store_call_from_webhook
+from src.services.embeddings.service import generate_embeddings_for_restaurant
+from src.services.infrastructure.auth import verify_vapi_secret
 import logging
 import asyncio
 import json
@@ -138,9 +139,13 @@ async def vapi_assistant_request(request: Request):
                             "number") or phone_value.get("phoneNumber")
 
         if phone_number and isinstance(phone_number, str):
-            from src.services.phone_mapping import get_restaurant_id_from_phone
+            from src.services.phones.mapping import get_restaurant_id_from_phone
             restaurant_id = get_restaurant_id_from_phone(phone_number)
             if restaurant_id:
+                logger.info(
+                    f"Assistant request processed: phone={phone_number}, restaurant_id={restaurant_id}",
+                    extra={"request_id": get_request_id(request)}
+                )
                 return {
                     "metadata": {
                         "restaurant_id": restaurant_id,
@@ -156,6 +161,69 @@ async def vapi_assistant_request(request: Request):
         )
 
     return {}
+
+
+@router.post(
+    "/end-of-call-report",
+    summary="Vapi End-of-Call-Report Webhook",
+    description="Receives call completion webhooks from Vapi. Stores call data including transcript and cost in database.",
+    responses={
+        200: {"description": "Call data stored successfully"},
+        401: {"description": "Invalid authentication"},
+        422: {"description": "Invalid webhook payload"},
+        500: {"description": "Failed to process webhook"}
+    }
+)
+async def end_of_call_report(
+    request: Request,
+    x_vapi_secret: Optional[str] = Header(
+        None, alias="X-Vapi-Secret", description="Vapi webhook secret for authentication")
+):
+    """
+    Vapi end-of-call-report webhook endpoint.
+
+    Receives call completion data from Vapi when a call ends.
+    Extracts essential data (phone number, timestamps, duration, transcript, cost)
+    and stores it in the call_history table after mapping phone to restaurant_id.
+    """
+    verify_vapi_secret(x_vapi_secret)
+
+    try:
+        body = await request.json()
+
+        # Parse webhook payload
+        parsed_data = parse_vapi_webhook(body)
+
+        # Store call record (maps phone to restaurant_id automatically)
+        call_id = store_call_from_webhook(parsed_data)
+
+        if call_id:
+            return {"success": True, "call_id": call_id}
+        else:
+            return {"success": False, "message": "Phone number not mapped to restaurant"}
+
+    except ValidationError as e:
+        request_id = get_request_id(request)
+        logger.error(
+            f"Invalid webhook payload: {e.errors()}",
+            exc_info=True,
+            extra={"request_id": request_id}
+        )
+        raise HTTPException(
+            status_code=422,
+            detail=f"Invalid webhook payload: {e.errors()}"
+        )
+    except Exception as e:
+        request_id = get_request_id(request)
+        logger.error(
+            f"Error processing end-of-call webhook: {e}",
+            exc_info=True,
+            extra={"request_id": request_id}
+        )
+        raise HTTPException(
+            status_code=500,
+            detail="Failed to process webhook"
+        )
 
 
 @router.post(
@@ -209,9 +277,16 @@ async def vapi_knowledge_base(
                          dict(request.query_params).get("restaurant_id") or
                          _extract_restaurant_id(None, vapi_request))
 
+        request_id = get_request_id(request)
+        if restaurant_id:
+            logger.info(
+                f"Processing knowledge-base request: tool={tool_name}, query='{query_text[:50]}...', restaurant_id={restaurant_id}",
+                extra={"request_id": request_id}
+            )
+
         if not restaurant_id:
             try:
-                from src.services.phone_mapping import get_restaurant_id_from_phone
+                from src.services.phones.mapping import get_restaurant_id_from_phone
 
                 body_dict = json.loads(body_bytes.decode('utf-8'))
                 message_obj = body_dict.get("message", {})
@@ -239,6 +314,11 @@ async def vapi_knowledge_base(
 
                 if phone_number and isinstance(phone_number, str):
                     restaurant_id = get_restaurant_id_from_phone(phone_number)
+                    if restaurant_id:
+                        logger.info(
+                            f"Restaurant ID resolved from phone: {phone_number[:10]}... -> {restaurant_id}",
+                            extra={"request_id": request_id}
+                        )
             except Exception as e:
                 request_id = get_request_id(request)
                 logger.error(
@@ -265,6 +345,10 @@ async def vapi_knowledge_base(
                 ),
                 timeout=15.0
             )
+            logger.info(
+                f"Vector search completed: found {len(results)} results for category={category}",
+                extra={"request_id": request_id}
+            )
         except asyncio.TimeoutError:
             return build_no_result(
                 tool_call_id,
@@ -272,10 +356,19 @@ async def vapi_knowledge_base(
             )
 
         if not results:
+            logger.info(
+                f"No results found for query: '{query_text[:50]}...' (category={category})",
+                extra={"request_id": request_id}
+            )
             return build_no_result(tool_call_id, category=category)
 
         response_text = "\n\n".join([doc["content"] for doc in results[:3]])
         items = build_structured_items(results, category)
+
+        logger.info(
+            f"Returning {len(items)} items to Vapi for tool_call_id={tool_call_id}",
+            extra={"request_id": request_id}
+        )
 
         return build_tool_result_with_items(tool_call_id, response_text, items)
 

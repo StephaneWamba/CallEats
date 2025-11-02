@@ -11,13 +11,13 @@ from src.models.restaurants import (
     UpdateRestaurantRequest,
     RestaurantResponse
 )
-from src.services.restaurant_service import (
+from src.services.restaurants.service import (
     create_restaurant as create_restaurant_service,
     get_restaurant as get_restaurant_service,
     update_restaurant as update_restaurant_service
 )
-from src.services.auth import verify_vapi_secret
-from src.middleware.request_id import get_request_id
+from src.services.infrastructure.auth import verify_vapi_secret
+from src.core.middleware.request_id import get_request_id
 import logging
 
 router = APIRouter()

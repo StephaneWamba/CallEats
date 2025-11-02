@@ -3,7 +3,7 @@ from fastapi import APIRouter, HTTPException
 from datetime import datetime
 import logging
 import asyncio
-from src.services.health_service import check_supabase, check_openai, check_vapi
+from src.services.infrastructure.health import check_supabase, check_openai, check_vapi
 
 router = APIRouter()
 logger = logging.getLogger(__name__)

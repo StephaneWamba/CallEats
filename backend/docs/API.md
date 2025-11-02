@@ -248,8 +248,9 @@ Main Vapi webhook endpoint for Function Tool calls. Performs vector similarity s
 **Automatic Embedding Generation:**
 
 All CRUD operations on menu items, modifiers, operating hours, and delivery zones automatically trigger background embedding generation:
+
 - **POST/PUT/DELETE** on menu items → generates `menu` embeddings
-- **POST/PUT/DELETE** on modifiers → generates `modifiers` embeddings  
+- **POST/PUT/DELETE** on modifiers → generates `modifiers` embeddings
 - **PUT/DELETE** on operating hours → generates `hours` embeddings
 - **POST/PUT/DELETE** on delivery zones → generates `zones` embeddings
 
@@ -445,6 +446,7 @@ X-Request-ID: 550e8400-e29b-41d4-a716-446655440000
 - Automatically generated for each request
 - Included in all error responses
 - Used in server logs for correlation
+- Shortened to 8 characters in logs for readability
 - Can be provided by client (for request tracing)
 
 **Example:**

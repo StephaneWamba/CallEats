@@ -1,7 +1,7 @@
 """Service for operating hours management."""
 from typing import List, Dict, Any, Optional
-from src.services.supabase_client import get_supabase_service_client
-from src.services.cache import clear_cache
+from src.services.infrastructure.database import get_supabase_service_client
+from src.services.infrastructure.cache import clear_cache
 import logging
 
 logger = logging.getLogger(__name__)
@@ -101,7 +101,7 @@ def update_operating_hours(
                 })
 
             resp = supabase.table("operating_hours").insert(records).execute()
-            
+
             if not resp.data:
                 raise Exception("Failed to update operating hours")
 
@@ -141,4 +141,3 @@ def delete_operating_hours(restaurant_id: str) -> bool:
         logger.error(
             f"Error deleting operating hours for restaurant_id={restaurant_id}: {e}", exc_info=True)
         raise
-

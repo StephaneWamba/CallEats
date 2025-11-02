@@ -4,7 +4,7 @@ Phone number to restaurant_id mapping service.
 Stores and retrieves phone number → restaurant_id mappings for routing calls
 to the correct restaurant when using a shared assistant.
 """
-from src.services.supabase_client import get_supabase_service_client
+from src.services.infrastructure.database import get_supabase_service_client
 from typing import Optional
 import logging
 

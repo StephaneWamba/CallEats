@@ -4,9 +4,9 @@ import os
 import logging
 import time
 import requests
-from vapi.client import VapiClient, VapiAPIError
-from vapi.manager import VapiResourceManager
-from src.services.phone_mapping import create_phone_mapping
+from src.services.vapi.client import VapiClient, VapiAPIError
+from src.services.vapi.manager import VapiResourceManager
+from src.services.phones.mapping import create_phone_mapping
 
 logger = logging.getLogger(__name__)
 
