@@ -58,6 +58,117 @@ def create_restaurant(
         "name": restaurant_data["name"],
         "api_key": restaurant_data["api_key"],
         "phone_number": phone_number,
-        "created_at": restaurant_data["created_at"]
+        "created_at": restaurant_data["created_at"],
+        "updated_at": restaurant_data.get("updated_at")
     }
+
+
+def get_restaurant(restaurant_id: str) -> Optional[Dict[str, Any]]:
+    """
+    Get a single restaurant by ID.
+
+    Args:
+        restaurant_id: Restaurant UUID
+
+    Returns:
+        Dictionary with restaurant data including phone_number if assigned, None if not found
+
+    Raises:
+        Exception: If database operation fails
+    """
+    supabase = get_supabase_service_client()
+
+    try:
+        resp = supabase.table("restaurants").select(
+            "id, name, api_key, created_at, updated_at"
+        ).eq("id", restaurant_id).limit(1).execute()
+
+        if not resp.data:
+            return None
+
+        restaurant_data = resp.data[0]
+        
+        phone_number = None
+        try:
+            phone_mappings = supabase.table("restaurant_phone_mappings").select(
+                "phone_number"
+            ).eq("restaurant_id", restaurant_id).limit(1).execute()
+            
+            if phone_mappings.data:
+                phone_number = phone_mappings.data[0].get("phone_number")
+        except Exception as e:
+            logger.warning(f"Error fetching phone mapping for restaurant {restaurant_id}: {e}")
+
+        return {
+            "id": restaurant_data["id"],
+            "name": restaurant_data["name"],
+            "api_key": restaurant_data["api_key"],
+            "phone_number": phone_number,
+            "created_at": restaurant_data["created_at"],
+            "updated_at": restaurant_data.get("updated_at")
+        }
+    except Exception as e:
+        logger.error(
+            f"Error fetching restaurant {restaurant_id}: {e}", exc_info=True)
+        raise
+
+
+def update_restaurant(
+    restaurant_id: str,
+    name: Optional[str] = None
+) -> Optional[Dict[str, Any]]:
+    """
+    Update a restaurant.
+
+    Args:
+        restaurant_id: Restaurant UUID
+        name: New restaurant name (optional)
+
+    Returns:
+        Updated restaurant data or None if not found
+
+    Raises:
+        Exception: If update fails
+    """
+    supabase = get_supabase_service_client()
+
+    update_data = {}
+    if name is not None:
+        update_data["name"] = name
+
+    if not update_data:
+        return get_restaurant(restaurant_id)
+
+    try:
+        resp = supabase.table("restaurants").update(update_data).eq(
+            "id", restaurant_id).execute()
+
+        if not resp.data:
+            return None
+
+        restaurant_data = resp.data[0]
+        
+        phone_number = None
+        try:
+            phone_mappings = supabase.table("restaurant_phone_mappings").select(
+                "phone_number"
+            ).eq("restaurant_id", restaurant_id).limit(1).execute()
+            
+            if phone_mappings.data:
+                phone_number = phone_mappings.data[0].get("phone_number")
+        except Exception as e:
+            logger.warning(f"Error fetching phone mapping for restaurant {restaurant_id}: {e}")
+
+        return {
+            "id": restaurant_data["id"],
+            "name": restaurant_data["name"],
+            "api_key": restaurant_data["api_key"],
+            "phone_number": phone_number,
+            "created_at": restaurant_data["created_at"],
+            "updated_at": restaurant_data.get("updated_at")
+        }
+    except Exception as e:
+        logger.error(
+            f"Error updating restaurant {restaurant_id}: {e}", exc_info=True)
+        raise
 

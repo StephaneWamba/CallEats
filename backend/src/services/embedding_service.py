@@ -2,9 +2,11 @@ from openai import AsyncOpenAI
 from src.config import get_settings
 from src.services.supabase_client import get_supabase_client, get_supabase_service_client
 from typing import Optional
+import logging
 
 settings = get_settings()
 openai_client = AsyncOpenAI(api_key=settings.openai_api_key)
+logger = logging.getLogger(__name__)
 
 
 async def generate_embedding(text: str) -> list[float]:
@@ -103,3 +105,57 @@ async def generate_embeddings_for_restaurant(
         "restaurant_id": restaurant_id,
         "embeddings_generated": total_generated
     }
+
+
+async def trigger_embedding_generation(
+    restaurant_id: str,
+    category: str
+) -> None:
+    """
+    Trigger embedding generation in background.
+
+    This function is designed to be called as a background task.
+    Errors are logged but do not propagate to avoid affecting the main request.
+
+    Args:
+        restaurant_id: Restaurant UUID
+        category: Category to regenerate (menu, modifiers, hours, zones)
+    """
+    try:
+        result = await generate_embeddings_for_restaurant(
+            restaurant_id=restaurant_id,
+            category=category
+        )
+        logger.info(
+            f"Background embedding generation completed for restaurant {restaurant_id}, "
+            f"category {category}: {result.get('embeddings_generated', 0)} embeddings"
+        )
+    except Exception as e:
+        logger.error(
+            f"Background embedding generation failed for restaurant {restaurant_id}, "
+            f"category {category}: {e}",
+            exc_info=True
+        )
+
+
+def add_embedding_task(
+    background_tasks,
+    restaurant_id: str,
+    category: str
+) -> None:
+    """
+    Add embedding generation as a background task.
+
+    Args:
+        background_tasks: FastAPI BackgroundTasks instance
+        restaurant_id: Restaurant UUID
+        category: Category to regenerate
+    """
+    background_tasks.add_task(
+        trigger_embedding_generation,
+        restaurant_id=restaurant_id,
+        category=category
+    )
+    logger.debug(
+        f"Queued background embedding generation for restaurant {restaurant_id}, category {category}"
+    )

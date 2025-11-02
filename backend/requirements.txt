@@ -10,5 +10,4 @@ httpx
 cachetools
 pyyaml
 requests
-slowapi
 

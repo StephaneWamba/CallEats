@@ -13,8 +13,6 @@ class Settings(BaseSettings):
     embedding_model: str = "text-embedding-3-small"
     embedding_dimensions: int = 1536
     cors_origins: str = "*"
-    rate_limit_enabled: bool = True
-    rate_limit_per_minute: int = 60
 
     model_config = ConfigDict(
         env_file=".env",

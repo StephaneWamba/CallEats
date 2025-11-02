@@ -36,6 +36,8 @@ class RestaurantResponse(BaseModel):
         None, description="Assigned phone number in E.164 format", example="+19014994418")
     created_at: str = Field(..., description="ISO 8601 timestamp",
                             example="2025-01-01T12:00:00Z")
+    updated_at: Optional[str] = Field(
+        None, description="ISO 8601 timestamp", example="2025-01-01T12:00:00Z")
 
     class Config:
         json_schema_extra = {
@@ -44,6 +46,20 @@ class RestaurantResponse(BaseModel):
                 "name": "Le Bistro Français",
                 "api_key": "api_key_abc123",
                 "phone_number": "+19014994418",
-                "created_at": "2025-01-01T12:00:00Z"
+                "created_at": "2025-01-01T12:00:00Z",
+                "updated_at": "2025-01-01T12:00:00Z"
+            }
+        }
+
+
+class UpdateRestaurantRequest(BaseModel):
+    """Request model for updating a restaurant."""
+    name: Optional[str] = Field(
+        None, description="Restaurant name", example="Le Bistro Français - Updated")
+
+    class Config:
+        json_schema_extra = {
+            "example": {
+                "name": "Le Bistro Français - Updated"
             }
         }

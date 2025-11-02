@@ -7,8 +7,9 @@ for text-to-speech synthesis.
 """
 from fastapi import APIRouter, Request, HTTPException, Header
 from typing import Optional
-from pydantic import ValidationError, BaseModel, Field
+from pydantic import ValidationError
 from src.models.vapi import VapiRequest
+from src.models.embeddings import CacheInvalidateRequest, GenerateEmbeddingsRequest
 from src.services.vector_search import search_knowledge_base
 from src.services.cache import clear_cache
 from src.config import get_settings
@@ -34,22 +35,6 @@ TOOL_CATEGORY_MAP = {
     "get_hours_info": "hours",
     "get_zones_info": "zones",
 }
-
-
-class CacheInvalidateRequest(BaseModel):
-    """Request model for cache invalidation."""
-    restaurant_id: str = Field(..., description="Restaurant UUID",
-                               example="04529052-b3dd-43c1-a534-c18d8c0f4c6d")
-    category: Optional[str] = Field(
-        None, description="Category to invalidate (menu, modifiers, hours, zones). Omit to clear all.", example="menu")
-
-
-class GenerateEmbeddingsRequest(BaseModel):
-    """Request model for embedding generation."""
-    restaurant_id: str = Field(..., description="Restaurant UUID",
-                               example="04529052-b3dd-43c1-a534-c18d8c0f4c6d")
-    category: Optional[str] = Field(
-        None, description="Category to generate (menu, modifiers, hours, zones). Omit to generate all.", example="menu")
 
 
 def _extract_restaurant_id(

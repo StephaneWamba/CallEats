@@ -4,10 +4,18 @@ Restaurant management API endpoints.
 Provides REST endpoints for creating and managing restaurants,
 including automatic phone number assignment.
 """
-from fastapi import APIRouter, HTTPException, Header, Request
+from fastapi import APIRouter, HTTPException, Header, Path, Request
 from typing import Optional
-from src.models.restaurants import CreateRestaurantRequest, RestaurantResponse
-from src.services.restaurant_service import create_restaurant as create_restaurant_service
+from src.models.restaurants import (
+    CreateRestaurantRequest,
+    UpdateRestaurantRequest,
+    RestaurantResponse
+)
+from src.services.restaurant_service import (
+    create_restaurant as create_restaurant_service,
+    get_restaurant as get_restaurant_service,
+    update_restaurant as update_restaurant_service
+)
 from src.services.auth import verify_vapi_secret
 from src.middleware.request_id import get_request_id
 import logging
@@ -76,3 +84,100 @@ def create_restaurant(
         )
         raise HTTPException(
             status_code=500, detail="Failed to create restaurant")
+
+
+@router.get(
+    "/restaurants/{restaurant_id}",
+    response_model=RestaurantResponse,
+    summary="Get Restaurant",
+    description="Get a single restaurant by ID, including assigned phone number.",
+    responses={
+        200: {"description": "Restaurant retrieved successfully"},
+        401: {"description": "Invalid authentication"},
+        404: {"description": "Restaurant not found"},
+        500: {"description": "Failed to fetch restaurant"}
+    }
+)
+def get_restaurant(
+    restaurant_id: str = Path(..., description="Restaurant UUID"),
+    x_vapi_secret: Optional[str] = Header(
+        None, alias="X-Vapi-Secret", description="Vapi webhook secret for authentication")
+):
+    """Get a single restaurant by ID."""
+    verify_vapi_secret(x_vapi_secret)
+
+    try:
+        restaurant_data = get_restaurant_service(restaurant_id)
+        if not restaurant_data:
+            raise HTTPException(
+                status_code=404, detail="Restaurant not found")
+
+        return RestaurantResponse(
+            id=restaurant_data["id"],
+            name=restaurant_data["name"],
+            api_key=restaurant_data["api_key"],
+            phone_number=restaurant_data["phone_number"],
+            created_at=restaurant_data["created_at"],
+            updated_at=restaurant_data.get("updated_at")
+        )
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(
+            f"Error fetching restaurant {restaurant_id}: {e}",
+            exc_info=True
+        )
+        raise HTTPException(
+            status_code=500, detail="Failed to fetch restaurant")
+
+
+@router.put(
+    "/restaurants/{restaurant_id}",
+    response_model=RestaurantResponse,
+    summary="Update Restaurant",
+    description="Update restaurant information. All fields are optional.",
+    responses={
+        200: {"description": "Restaurant updated successfully"},
+        401: {"description": "Invalid authentication"},
+        404: {"description": "Restaurant not found"},
+        500: {"description": "Failed to update restaurant"}
+    }
+)
+def update_restaurant(
+    http_request: Request,
+    restaurant_id: str = Path(..., description="Restaurant UUID"),
+    request: UpdateRestaurantRequest = ...,
+    x_vapi_secret: Optional[str] = Header(
+        None, alias="X-Vapi-Secret", description="Vapi webhook secret for authentication")
+):
+    """Update a restaurant."""
+    verify_vapi_secret(x_vapi_secret)
+
+    try:
+        restaurant_data = update_restaurant_service(
+            restaurant_id=restaurant_id,
+            name=request.name
+        )
+        if not restaurant_data:
+            raise HTTPException(
+                status_code=404, detail="Restaurant not found")
+
+        return RestaurantResponse(
+            id=restaurant_data["id"],
+            name=restaurant_data["name"],
+            api_key=restaurant_data["api_key"],
+            phone_number=restaurant_data["phone_number"],
+            created_at=restaurant_data["created_at"],
+            updated_at=restaurant_data.get("updated_at")
+        )
+    except HTTPException:
+        raise
+    except Exception as e:
+        request_id = get_request_id(http_request)
+        logger.error(
+            f"Error updating restaurant {restaurant_id}: {e}",
+            exc_info=True,
+            extra={"request_id": request_id}
+        )
+        raise HTTPException(
+            status_code=500, detail="Failed to update restaurant")

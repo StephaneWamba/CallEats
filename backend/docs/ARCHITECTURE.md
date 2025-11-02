@@ -210,7 +210,7 @@ erDiagram
 - **phone_mapping.py**: Phone → restaurant_id mapping
 - **twilio_service.py**: Twilio API integration
 - **vector_search.py**: Vector similarity search
-- **embedding_service.py**: OpenAI embeddings generation
+- **embedding_service.py**: OpenAI embeddings generation, background task management
 - **cache.py**: In-memory caching (TTL: 60s)
 - **vapi_response.py**: Vapi response formatting
 
@@ -247,11 +247,19 @@ erDiagram
 - Service role key used for writes (bypasses RLS)
 - Anon key used for reads (respects RLS)
 
+## Embedding Generation
+
+- **Automatic**: Background generation triggered on all data changes (POST/PUT/DELETE)
+- **Async**: Non-blocking, runs after API response
+- **Category-Specific**: Only affected category is regenerated
+- **Error Handling**: Failures logged but don't affect main request
+- **Manual**: Optional `/api/embeddings/generate` endpoint for manual triggers
+
 ## Caching Strategy
 
 - **Cache Key**: `{restaurant_id}:{category}:{query}`
 - **TTL**: 60 seconds (configurable via `CACHE_TTL_SECONDS`)
-- **Invalidation**: Manual via `/api/embeddings/cache/invalidate`
+- **Invalidation**: Automatic on data changes, manual via `/api/embeddings/cache/invalidate`
 - **Storage**: In-memory (TTLCache from cachetools)
 
 ## Security

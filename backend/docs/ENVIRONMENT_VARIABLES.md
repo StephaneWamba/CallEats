@@ -215,59 +215,6 @@ ENVIRONMENT=production
 
 ---
 
-### RATE_LIMIT_ENABLED
-
-**Required**: No (optional)  
-**Default**: `true`  
-**Values**: `true` | `false`
-
-Enable or disable rate limiting on API endpoints.
-
-**Behavior:**
-
-- When `true`: Rate limiting is applied to all endpoints (except health checks and docs)
-- When `false`: Rate limiting is completely disabled
-
-**Used by:**
-
-- `src/main.py` - Rate limiting middleware
-
-**Example:**
-
-```bash
-RATE_LIMIT_ENABLED=true
-```
-
----
-
-### RATE_LIMIT_PER_MINUTE
-
-**Required**: No (optional)  
-**Default**: `60`  
-**Values**: Positive integer
-
-Maximum number of requests allowed per minute per IP address.
-
-**Behavior:**
-
-- Applies per IP address (based on `X-Forwarded-For` or direct connection)
-- Excluded endpoints: `/api/health`, `/docs`, `/openapi.json`, `/`
-- Returns HTTP 429 when limit exceeded
-
-**Used by:**
-
-- `src/main.py` - Rate limiting middleware
-
-**Example:**
-
-```bash
-RATE_LIMIT_PER_MINUTE=60
-```
-
-**Note**: Adjust based on your expected traffic and server capacity.
-
----
-
 ## Environment File Setup
 
 ### Development

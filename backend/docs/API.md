@@ -28,7 +28,6 @@ Enhanced health check endpoint with service connectivity checks.
 - Checks connectivity to all external services (Supabase, OpenAI, Vapi)
 - Returns detailed status for each service
 - Measures latency for performance monitoring
-- Excluded from rate limiting
 
 **Response (All Healthy):**
 
@@ -246,9 +245,19 @@ Main Vapi webhook endpoint for Function Tool calls. Performs vector similarity s
 
 ### Embeddings
 
+**Automatic Embedding Generation:**
+
+All CRUD operations on menu items, modifiers, operating hours, and delivery zones automatically trigger background embedding generation:
+- **POST/PUT/DELETE** on menu items → generates `menu` embeddings
+- **POST/PUT/DELETE** on modifiers → generates `modifiers` embeddings  
+- **PUT/DELETE** on operating hours → generates `hours` embeddings
+- **POST/PUT/DELETE** on delivery zones → generates `zones` embeddings
+
+Embedding generation runs asynchronously in the background and does not block the API response. You can also manually trigger embedding generation using the endpoint below.
+
 #### `POST /api/embeddings/generate`
 
-Generate embeddings for restaurant data (menu, modifiers, hours, zones).
+Manually generate embeddings for restaurant data (menu, modifiers, hours, zones). Typically not needed since embeddings are generated automatically on data changes.
 
 **Headers:**
 
@@ -420,40 +429,6 @@ All endpoints return errors in this format:
 - `401`: Authentication failed (invalid `X-Vapi-Secret`)
 - `422`: Validation error (missing required field, invalid format)
 - `500`: Internal server error
-
-## Rate Limiting
-
-Rate limiting is enabled by default to protect the API from abuse.
-
-**Configuration:**
-
-- Default: 60 requests per minute per IP address
-- Configurable via `RATE_LIMIT_ENABLED` and `RATE_LIMIT_PER_MINUTE` environment variables
-- Can be disabled by setting `RATE_LIMIT_ENABLED=false`
-
-**Behavior:**
-
-- Applied to all endpoints except:
-  - `/api/health` (health checks)
-  - `/docs` and `/openapi.json` (API documentation)
-  - `/` (root endpoint)
-
-**Response:**
-When rate limit is exceeded:
-
-- Status Code: `429 Too Many Requests`
-- Response includes:
-  - Error message with limit details
-  - `X-Request-ID` header for tracking
-
-**Example:**
-
-```json
-{
-  "detail": "Rate limit exceeded: 60 requests per minute",
-  "request_id": "550e8400-e29b-41d4-a716-446655440000"
-}
-```
 
 ## Request ID Tracking
 
