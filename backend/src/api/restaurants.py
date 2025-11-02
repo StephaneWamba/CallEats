@@ -16,7 +16,8 @@ from src.services.restaurants.service import (
     get_restaurant as get_restaurant_service,
     update_restaurant as update_restaurant_service
 )
-from src.services.infrastructure.auth import verify_vapi_secret
+from src.services.phones.details import get_phone_details, test_phone_connectivity
+from src.services.infrastructure.auth import require_auth, require_restaurant_access
 from src.core.middleware.request_id import get_request_id
 import logging
 
@@ -54,8 +55,9 @@ def create_restaurant(
     - Twilio account has available numbers/quota
 
     Returns restaurant data including phone number if assigned.
+    Accepts JWT (frontend users) or X-Vapi-Secret (admin/scripts) for authentication.
     """
-    verify_vapi_secret(x_vapi_secret)
+    require_auth(http_request, x_vapi_secret)
 
     try:
         restaurant_data = create_restaurant_service(
@@ -99,12 +101,13 @@ def create_restaurant(
     }
 )
 def get_restaurant(
+    request: Request,
     restaurant_id: str = Path(..., description="Restaurant UUID"),
     x_vapi_secret: Optional[str] = Header(
         None, alias="X-Vapi-Secret", description="Vapi webhook secret for authentication")
 ):
-    """Get a single restaurant by ID."""
-    verify_vapi_secret(x_vapi_secret)
+    """Get a single restaurant by ID. Accepts JWT or X-Vapi-Secret."""
+    require_restaurant_access(request, restaurant_id, x_vapi_secret)
 
     try:
         restaurant_data = get_restaurant_service(restaurant_id)
@@ -150,8 +153,8 @@ def update_restaurant(
     x_vapi_secret: Optional[str] = Header(
         None, alias="X-Vapi-Secret", description="Vapi webhook secret for authentication")
 ):
-    """Update a restaurant."""
-    verify_vapi_secret(x_vapi_secret)
+    """Update a restaurant. Accepts JWT or X-Vapi-Secret."""
+    require_restaurant_access(http_request, restaurant_id, x_vapi_secret)
 
     try:
         restaurant_data = update_restaurant_service(
@@ -181,3 +184,101 @@ def update_restaurant(
         )
         raise HTTPException(
             status_code=500, detail="Failed to update restaurant")
+
+
+@router.get(
+    "/restaurants/{restaurant_id}/phone",
+    summary="Get Phone Details",
+    description="Get phone number details and status for a restaurant.",
+    responses={
+        200: {"description": "Phone details retrieved successfully"},
+        401: {"description": "Invalid authentication"},
+        404: {"description": "Restaurant not found"},
+        500: {"description": "Failed to fetch phone details"}
+    }
+)
+def get_phone(
+    request: Request,
+    restaurant_id: str = Path(..., description="Restaurant UUID"),
+    x_vapi_secret: Optional[str] = Header(
+        None, alias="X-Vapi-Secret", description="Vapi webhook secret for authentication")
+):
+    """
+    Get phone number details and status for a restaurant.
+
+    Returns phone number, Vapi assignment status, provider, and connection status.
+    Accepts JWT or X-Vapi-Secret.
+    """
+    require_restaurant_access(request, restaurant_id, x_vapi_secret)
+
+    try:
+        # Verify restaurant exists
+        restaurant_data = get_restaurant_service(restaurant_id)
+        if not restaurant_data:
+            raise HTTPException(
+                status_code=404, detail="Restaurant not found")
+
+        phone_details = get_phone_details(restaurant_id)
+
+        if not phone_details:
+            return {
+                "phone_number": None,
+                "connected": False,
+                "status": "No phone number assigned to restaurant"
+            }
+
+        return phone_details
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(
+            f"Error fetching phone details for restaurant {restaurant_id}: {e}",
+            exc_info=True
+        )
+        raise HTTPException(
+            status_code=500, detail="Failed to fetch phone details")
+
+
+@router.post(
+    "/restaurants/{restaurant_id}/phone/test",
+    summary="Test Phone Connectivity",
+    description="Test phone number connectivity and verify assignment status.",
+    responses={
+        200: {"description": "Phone connectivity test completed"},
+        401: {"description": "Invalid authentication"},
+        404: {"description": "Restaurant not found"},
+        500: {"description": "Failed to test phone connectivity"}
+    }
+)
+def test_phone(
+    request: Request,
+    restaurant_id: str = Path(..., description="Restaurant UUID"),
+    x_vapi_secret: Optional[str] = Header(
+        None, alias="X-Vapi-Secret", description="Vapi webhook secret for authentication")
+):
+    """
+    Test phone number connectivity and status.
+
+    Verifies that the phone number is assigned to the Vapi assistant and is operational.
+    Accepts JWT or X-Vapi-Secret.
+    """
+    require_restaurant_access(request, restaurant_id, x_vapi_secret)
+
+    try:
+        # Verify restaurant exists
+        restaurant_data = get_restaurant_service(restaurant_id)
+        if not restaurant_data:
+            raise HTTPException(
+                status_code=404, detail="Restaurant not found")
+
+        test_result = test_phone_connectivity(restaurant_id)
+        return test_result
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(
+            f"Error testing phone connectivity for restaurant {restaurant_id}: {e}",
+            exc_info=True
+        )
+        raise HTTPException(
+            status_code=500, detail="Failed to test phone connectivity")

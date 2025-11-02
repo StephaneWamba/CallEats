@@ -74,10 +74,11 @@ class VapiResourceManager:
 
         if for_assistant:
             tool_messages = self.config["prompts"].get("tool_messages", {})
-            request_start = tool_messages.get(
-                "request_start", "Let me check that for you.")
-            tool_config["messages"] = [
-                {"type": "request-start", "content": request_start}]
+            request_start = tool_messages.get("request_start")
+            # Only add tool message if explicitly configured (not null/empty)
+            if request_start:
+                tool_config["messages"] = [
+                    {"type": "request-start", "content": request_start}]
 
         return tool_config
 
@@ -119,16 +120,38 @@ class VapiResourceManager:
             {"role": "system", "content": system_prompt}]
         model_config["tools"] = tools_block
 
+        unified_server_url = f"{self.backend_url}/api/vapi/server"
+
+        # Only set firstMessage if it's explicitly provided (not null/empty)
+        first_message = self.config["prompts"].get("first_message")
         assistant_config.update({
             "model": model_config,
-            "firstMessage": self.config["prompts"]["first_message"],
-            "serverUrl": f"{self.backend_url}/api/vapi/assistant-request",
+            "server": {
+                "url": unified_server_url
+            },
+            "serverUrl": unified_server_url,
             "serverUrlSecret": self.client.api_key
         })
+        if first_message:
+            assistant_config["firstMessage"] = first_message
 
         assistant_id = self.client.create_assistant(assistant_config).get("id")
         if not assistant_id:
             raise VapiAPIError("Assistant creation returned no ID")
+
+        try:
+            webhook_config = {
+                "serverMessages": ["status-update", "end-of-call-report"]
+            }
+            self.client.update_assistant(assistant_id, webhook_config)
+            logger.info(
+                f"Assistant {assistant_id} configured with status-update and end-of-call-report: {unified_server_url}")
+        except Exception as e:
+            logger.warning(
+                f"Could not configure serverMessages (server URL already set): {e}")
+            logger.info(
+                f"Assistant {assistant_id} configured: {unified_server_url}")
+
         return assistant_id
 
     def assign_phone_number(

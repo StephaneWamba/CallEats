@@ -47,7 +47,7 @@ sequenceDiagram
     participant D as Database
 
     C->>V: Calls phone number
-    V->>B: POST /api/vapi/assistant-request<br/>(phone number in metadata)
+    V->>B: POST /api/vapi/server<br/>{message: {type: "assistant-request", phoneNumber: {...}}}
     B->>P: get_restaurant_id_from_phone()
     P->>D: Query restaurant_phone_mappings
     D-->>P: restaurant_id
@@ -70,14 +70,14 @@ Complete flow from customer call to voice response:
 sequenceDiagram
     participant C as Customer
     participant V as Vapi
-    participant A as Assistant Request
+    participant A as Unified Server
     participant KB as Knowledge Base
     participant VS as Vector Search
     participant S as Supabase
     participant O as OpenAI
 
     C->>V: Calls +1234567890
-    V->>A: POST /api/vapi/assistant-request<br/>{phoneNumber: "+1234567890"}
+    V->>A: POST /api/vapi/server<br/>{message: {type: "assistant-request", phoneNumber: {...}}}
     A->>S: Lookup phone → restaurant_id
     S-->>A: restaurant_id: "abc-123"
     A-->>V: {metadata: {restaurant_id: "abc-123"}}
@@ -141,11 +141,15 @@ Key tables and relationships:
 erDiagram
     restaurants ||--o{ menu_items : has
     restaurants ||--o{ modifiers : has
+    restaurants ||--o{ categories : has
     restaurants ||--o{ operating_hours : has
     restaurants ||--o{ delivery_zones : has
     restaurants ||--o{ document_embeddings : has
     restaurants ||--o{ restaurant_phone_mappings : has
     restaurants ||--o{ call_history : has
+    restaurants ||--o{ users : has
+    menu_items }o--o{ modifiers : "linked via"
+    menu_items }o--|| categories : "belongs to"
 
     restaurants {
         uuid id PK
@@ -185,6 +189,39 @@ erDiagram
         time close_time
         boolean is_closed
     }
+
+    categories {
+        uuid id PK
+        uuid restaurant_id FK
+        string name
+        text description
+        integer display_order
+    }
+
+    menu_item_modifiers {
+        uuid id PK
+        uuid menu_item_id FK
+        uuid modifier_id FK
+        boolean is_required
+        integer display_order
+    }
+
+    users {
+        uuid id PK
+        uuid restaurant_id FK
+        string email
+        string role
+    }
+
+    delivery_zones {
+        uuid id PK
+        uuid restaurant_id FK
+        string zone_name
+        geometry boundary
+        geometry center_point
+        decimal delivery_fee
+        decimal min_order
+    }
 ```
 
 ## Component Responsibilities
@@ -192,9 +229,9 @@ erDiagram
 ### FastAPI Backend (`src/main.py`)
 
 - Main application entry point
-- CORS middleware configuration
+- Middleware configuration (Auth → RequestID → CORS)
 - Global exception handling
-- Route registration
+- Route registration (auth, restaurants, menu, operations, webhooks)
 
 ### Core Infrastructure (`src/core/`)
 
@@ -210,13 +247,20 @@ erDiagram
   - **Third-Party Suppression**: Verbose logs from external libraries suppressed
   - **Format**: `LEVEL | [module] [req=id] message`
 - **middleware/request_id.py**: Request ID generation and tracking
+- **middleware/auth.py**: JWT verification middleware (Supabase Auth)
 
 ### API Endpoints (`src/api/`)
 
+- **auth.py**: User registration, login, JWT token management
 - **restaurants.py**: Restaurant CRUD, phone assignment
-- **vapi.py**: Vapi webhooks (assistant-request, knowledge-base)
+- **categories.py**: Category CRUD operations
+- **menu_items.py**: Menu items CRUD, modifier linking
+- **modifiers.py**: Modifiers CRUD
+- **operating_hours.py**: Operating hours management
+- **delivery_zones.py**: Zone CRUD, boundary management (PostGIS), point-in-zone checks
+- **vapi.py**: Vapi webhooks (unified server endpoint, knowledge-base)
 - **embeddings.py**: Embedding generation, cache invalidation
-- **calls.py**: Call history management
+- **calls.py**: Call history management (filtered messages)
 - **health.py**: Health check endpoint
 
 ### Services (`src/services/`)
@@ -224,24 +268,37 @@ erDiagram
 Services are organized by domain:
 
 - **restaurants/service.py**: Restaurant CRUD operations
+- **menu/**: Menu management
+  - **items.py**: Menu items CRUD, category relationships
+  - **categories.py**: Category CRUD operations
+  - **item_modifiers.py**: Junction table operations (link/unlink modifiers)
+- **operations/**: Business operations
+  - **zones.py**: Delivery zone CRUD
+  - **zone_geometry.py**: PostGIS spatial queries (boundary setting, point-in-zone)
+  - **hours.py**: Operating hours management
 - **phones/**: Phone management
   - **service.py**: Phone assignment orchestration
   - **mapping.py**: Phone → restaurant_id mapping
   - **twilio.py**: Twilio API integration
+  - **extraction.py**: Restaurant ID extraction from various sources
 - **embeddings/**: Vector embeddings
   - **service.py**: OpenAI embeddings generation, background task management
   - **search.py**: Vector similarity search
 - **calls/**: Call management
-  - **service.py**: Call history CRUD
-  - **webhook.py**: Vapi webhook processing
+  - **service.py**: Call history CRUD, message filtering
+  - **parser.py**: Vapi call data parsing and transformation
+  - **fetch.py**: Fetch call data from Vapi API
+- **auth/**: Authentication
+  - **service.py**: User registration, login business logic
 - **vapi/**: Vapi integration
   - **client.py**: Vapi API client wrapper
   - **manager.py**: Resource manager (tools, assistants)
   - **response.py**: Vapi response formatting
+  - **knowledge.py**: Knowledge base tool call handler
 - **infrastructure/**: Core infrastructure services
   - **cache.py**: In-memory caching (TTL: 60s)
   - **database.py**: Database client (Supabase)
-  - **auth.py**: Authentication/authorization
+  - **auth.py**: Authentication utilities (dual auth support)
   - **health.py**: Health check service
 
 ### Vapi Configuration (`vapi/`)
@@ -278,22 +335,55 @@ Services are organized by domain:
 ## Embedding Generation
 
 - **Automatic**: Background generation triggered on all data changes (POST/PUT/DELETE)
-- **Async**: Non-blocking, runs after API response
+- **Async**: Non-blocking, runs after API response (doesn't delay API calls)
 - **Category-Specific**: Only affected category is regenerated
-- **Error Handling**: Failures logged but don't affect main request
+- **Error Handling**: Failures logged but don't affect main request (restaurant creation still succeeds)
+- **Timing**: Can take several seconds to minutes depending on data volume (runs in background)
 - **Manual**: Optional `/api/embeddings/generate` endpoint for manual triggers
 
 ## Caching Strategy
 
 - **Cache Key**: `{restaurant_id}:{category}:{query}`
-- **TTL**: 60 seconds (configurable via `CACHE_TTL_SECONDS`)
+- **TTL**: 60 seconds (configurable via `CACHE_TTL_SECONDS` environment variable)
+- **Max Size**: 1000 entries (automatically evicts oldest when full)
 - **Invalidation**: Automatic on data changes, manual via `/api/embeddings/cache/invalidate`
 - **Storage**: In-memory (TTLCache from cachetools)
+- **Multi-Instance Note**: For production with multiple backend instances, consider Redis for shared caching
+
+## Call History Message Filtering
+
+Call history messages are filtered to include only essential fields:
+
+- **Roles**: `user`, `assistant`, `bot` (excludes `system`, `tool_calls`, `tool_call_result`)
+- **Fields**: Only `role` and `content` (removes metadata, timestamps, etc.)
+- Applied both during parsing (from Vapi) and retrieval (from database)
+
+## Call Data Capture
+
+**Webhook Reliability Issue**: Vapi webhooks are unreliable - final "ended" webhooks often don't arrive.
+
+**Fallback Mechanism**:
+
+- System automatically schedules an API fetch 30 seconds after detecting a call (via `status-update: ringing` or `end-of-call-report`)
+- Uses Vapi API to retrieve complete call data (transcript, duration, cost)
+- Ensures call history is captured even when webhooks fail
+- Prevents duplicate fetches using thread-safe tracking
+
+## Spatial Queries (PostGIS)
+
+Delivery zones support geographic boundary definition:
+
+- **Storage**: `boundary` column (GEOMETRY POLYGON) and `center_point` (GEOMETRY POINT)
+- **Functions**: Database RPC functions for boundary setting and point-in-zone checks
+- **Format**: GeoJSON (Polygon/MultiPolygon) for boundary input/output
+- **Indexing**: GIST spatial indexes for efficient queries
 
 ## Security
 
-- **Vapi Webhooks**: HMAC verification via `X-Vapi-Secret` header
-- **API Endpoints**: Protected by `VAPI_SECRET_KEY`
+- **Dual Authentication**: JWT (frontend users) + X-Vapi-Secret (webhooks/admin)
+- **JWT Verification**: Supabase Auth middleware verifies tokens automatically
+- **Restaurant Access Control**: JWT users can only access their own restaurant's data
+- **Vapi Webhooks**: Verified via `X-Vapi-Secret` header
 - **Database**: RLS policies for multi-tenant isolation
 - **Service Role**: Only used for admin operations (writes)
 
@@ -301,12 +391,15 @@ Services are organized by domain:
 
 - **Single Vapi Assistant**: Shared across all restaurants
 - **Phone Reuse**: Assigns existing phones before creating new ones
-- **Caching**: Reduces OpenAI embedding API calls
-- **Vector Search**: Efficient pgvector indexing
+- **Caching**: Reduces OpenAI embedding API calls (60s TTL)
+- **Vector Search**: Efficient pgvector indexing (HNSW)
+- **Spatial Indexing**: GIST indexes for PostGIS queries
 
 ## Scalability Considerations
 
 - **Horizontal Scaling**: Stateless FastAPI app, can run multiple instances
 - **Database**: Supabase scales PostgreSQL automatically
-- **Caching**: Consider Redis for multi-instance deployments
+- **Caching**: Consider Redis for multi-instance deployments (currently in-memory per instance)
 - **Phone Limits**: Twilio account quotas apply per restaurant
+- **Background Tasks**: FastAPI BackgroundTasks run per-instance (consider Celery for distributed tasks)
+- **Webhook Reliability**: Uses 30-second delayed API fetch fallback (thread-based, works per-instance)

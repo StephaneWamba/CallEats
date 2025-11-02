@@ -12,13 +12,13 @@ from src.models.modifiers import (
     UpdateModifierRequest
 )
 from src.services.menu.modifiers import (
-    list_modifiers,
-    get_modifier,
-    create_modifier,
-    update_modifier,
-    delete_modifier
+    list_modifiers as list_modifiers_service,
+    get_modifier as get_modifier_service,
+    create_modifier as create_modifier_service,
+    update_modifier as update_modifier_service,
+    delete_modifier as delete_modifier_service
 )
-from src.services.infrastructure.auth import verify_vapi_secret
+from src.services.infrastructure.auth import require_restaurant_access
 from src.services.embeddings.service import add_embedding_task
 from src.core.middleware.request_id import get_request_id
 import logging
@@ -39,16 +39,17 @@ logger = logging.getLogger(__name__)
         500: {"description": "Failed to fetch modifiers"}
     }
 )
-def list_modifiers_endpoint(
+def list_modifiers(
+    request: Request,
     restaurant_id: str = Path(..., description="Restaurant UUID"),
     x_vapi_secret: Optional[str] = Header(
         None, alias="X-Vapi-Secret", description="Vapi webhook secret for authentication")
 ):
-    """List all modifiers for a restaurant."""
-    verify_vapi_secret(x_vapi_secret)
+    """List all modifiers for a restaurant. Accepts JWT or X-Vapi-Secret."""
+    require_restaurant_access(request, restaurant_id, x_vapi_secret)
 
     try:
-        items = list_modifiers(restaurant_id)
+        items = list_modifiers_service(restaurant_id)
         return items
     except Exception as e:
         logger.error(
@@ -71,17 +72,18 @@ def list_modifiers_endpoint(
         500: {"description": "Failed to fetch modifier"}
     }
 )
-def get_modifier_endpoint(
+def get_modifier(
+    request: Request,
     restaurant_id: str = Path(..., description="Restaurant UUID"),
     modifier_id: str = Path(..., description="Modifier UUID"),
     x_vapi_secret: Optional[str] = Header(
         None, alias="X-Vapi-Secret", description="Vapi webhook secret for authentication")
 ):
-    """Get a single modifier by ID."""
-    verify_vapi_secret(x_vapi_secret)
+    """Get a single modifier by ID. Accepts JWT or X-Vapi-Secret."""
+    require_restaurant_access(request, restaurant_id, x_vapi_secret)
 
     try:
-        item = get_modifier(restaurant_id, modifier_id)
+        item = get_modifier_service(restaurant_id, modifier_id)
         if not item:
             raise HTTPException(
                 status_code=404, detail="Modifier not found")
@@ -109,7 +111,7 @@ def get_modifier_endpoint(
         500: {"description": "Failed to create modifier"}
     }
 )
-def create_modifier_endpoint(
+def create_modifier(
     http_request: Request,
     background_tasks: BackgroundTasks,
     restaurant_id: str = Path(..., description="Restaurant UUID"),
@@ -117,11 +119,11 @@ def create_modifier_endpoint(
     x_vapi_secret: Optional[str] = Header(
         None, alias="X-Vapi-Secret", description="Vapi webhook secret for authentication")
 ):
-    """Create a new modifier. Automatically triggers background embedding generation."""
-    verify_vapi_secret(x_vapi_secret)
+    """Create a new modifier. Automatically triggers background embedding generation. Accepts JWT or X-Vapi-Secret."""
+    require_restaurant_access(http_request, restaurant_id, x_vapi_secret)
 
     try:
-        item = create_modifier(
+        item = create_modifier_service(
             restaurant_id=restaurant_id,
             name=request.name,
             description=request.description,
@@ -154,7 +156,7 @@ def create_modifier_endpoint(
         500: {"description": "Failed to update modifier"}
     }
 )
-def update_modifier_endpoint(
+def update_modifier(
     http_request: Request,
     background_tasks: BackgroundTasks,
     restaurant_id: str = Path(..., description="Restaurant UUID"),
@@ -163,11 +165,11 @@ def update_modifier_endpoint(
     x_vapi_secret: Optional[str] = Header(
         None, alias="X-Vapi-Secret", description="Vapi webhook secret for authentication")
 ):
-    """Update a modifier. Automatically triggers background embedding generation."""
-    verify_vapi_secret(x_vapi_secret)
+    """Update a modifier. Automatically triggers background embedding generation. Accepts JWT or X-Vapi-Secret."""
+    require_restaurant_access(http_request, restaurant_id, x_vapi_secret)
 
     try:
-        item = update_modifier(
+        item = update_modifier_service(
             restaurant_id=restaurant_id,
             modifier_id=modifier_id,
             name=request.name,
@@ -205,7 +207,7 @@ def update_modifier_endpoint(
         500: {"description": "Failed to delete modifier"}
     }
 )
-def delete_modifier_endpoint(
+def delete_modifier(
     http_request: Request,
     background_tasks: BackgroundTasks,
     restaurant_id: str = Path(..., description="Restaurant UUID"),
@@ -213,11 +215,11 @@ def delete_modifier_endpoint(
     x_vapi_secret: Optional[str] = Header(
         None, alias="X-Vapi-Secret", description="Vapi webhook secret for authentication")
 ):
-    """Delete a modifier. Automatically triggers background embedding generation."""
-    verify_vapi_secret(x_vapi_secret)
+    """Delete a modifier. Automatically triggers background embedding generation. Accepts JWT or X-Vapi-Secret."""
+    require_restaurant_access(http_request, restaurant_id, x_vapi_secret)
 
     try:
-        deleted = delete_modifier(restaurant_id, modifier_id)
+        deleted = delete_modifier_service(restaurant_id, modifier_id)
         if not deleted:
             raise HTTPException(
                 status_code=404, detail="Modifier not found")

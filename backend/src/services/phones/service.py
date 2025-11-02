@@ -45,9 +45,7 @@ def assign_phone_to_restaurant(restaurant_id: str, force_twilio: bool = False) -
 
         assistant_id = existing_assistant.get("id")
 
-        # Skip existing phones if force_twilio is True
         if not force_twilio:
-            # Try to assign existing unassigned phone number
             phone_numbers = manager.client.list_phone_numbers()
             if phone_numbers:
                 available_phone = None
@@ -92,8 +90,6 @@ def assign_phone_to_restaurant(restaurant_id: str, force_twilio: bool = False) -
         twilio_auth_token = os.environ.get("TWILIO_AUTH_TOKEN")
 
         if twilio_account_sid and twilio_auth_token:
-            logger.info(
-                f"Attempting to create Twilio phone for restaurant {restaurant_id}")
             return create_and_assign_twilio_phone(
                 restaurant_id=restaurant_id,
                 assistant_id=assistant_id,

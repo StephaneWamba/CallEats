@@ -21,3 +21,7 @@ htmlcov/
 # Ignore ignore files themselves (but track .dockerignore)
 .gitignore
 
+# Development scripts and tests
+scripts/dev/
+tests/
+

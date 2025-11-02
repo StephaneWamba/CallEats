@@ -7,6 +7,66 @@ import logging
 logger = logging.getLogger(__name__)
 
 
+def _filter_messages(messages: Optional[List[Dict[str, Any]]]) -> List[Dict[str, Any]]:
+    """
+    Filter messages to only include user and assistant (bot) messages.
+    Keep only essential fields: role and content.
+    """
+    if not messages:
+        return []
+
+    filtered = []
+    for msg in messages:
+        if isinstance(msg, dict) and msg.get("role") in ["user", "assistant", "bot"]:
+            # Extract only essential fields: role and content
+            content = msg.get("content") or msg.get("message", "")
+            if content:  # Only include messages with content
+                filtered.append({
+                    "role": msg.get("role"),
+                    "content": content
+                })
+
+    return filtered
+
+
+def get_call(call_id: str, restaurant_id: Optional[str] = None) -> Optional[Dict[str, Any]]:
+    """
+    Get a single call record by ID.
+
+    Args:
+        call_id: Call record UUID
+        restaurant_id: Optional restaurant UUID for verification (security check)
+
+    Returns:
+        Call record with full transcript, None if not found
+    """
+    supabase = get_supabase_service_client()
+
+    try:
+        query = supabase.table("call_history").select(
+            "id, restaurant_id, started_at, ended_at, duration_seconds, caller, outcome, messages, cost"
+        ).eq("id", call_id)
+
+        if restaurant_id:
+            query = query.eq("restaurant_id", restaurant_id)
+
+        resp = query.limit(1).execute()
+
+        if not resp.data:
+            return None
+
+        call = resp.data[0]
+        # Filter messages to exclude system/tool messages
+        if call.get("messages"):
+            call["messages"] = _filter_messages(call["messages"])
+
+        return call
+    except Exception as e:
+        logger.error(
+            f"Error fetching call {call_id}: {e}", exc_info=True)
+        raise
+
+
 def list_calls(restaurant_id: str, limit: int = 50) -> List[Dict[str, Any]]:
     """
     List call history for a restaurant.
@@ -25,7 +85,13 @@ def list_calls(restaurant_id: str, limit: int = 50) -> List[Dict[str, Any]]:
             "id, started_at, ended_at, duration_seconds, caller, outcome, messages, cost"
         ).eq("restaurant_id", restaurant_id).order("started_at", desc=True).limit(limit).execute()
 
-        return resp.data or []
+        calls = resp.data or []
+        # Filter messages for each call to exclude system/tool messages
+        for call in calls:
+            if call.get("messages"):
+                call["messages"] = _filter_messages(call["messages"])
+
+        return calls
     except Exception as e:
         logger.error(
             f"Error fetching calls for restaurant_id={restaurant_id}: {e}", exc_info=True)

@@ -11,12 +11,12 @@ from src.models.operating_hours import (
     UpdateOperatingHoursRequest
 )
 from src.services.operations.hours import (
-    list_operating_hours,
-    get_operating_hour,
-    update_operating_hours,
-    delete_operating_hours
+    list_operating_hours as list_operating_hours_service,
+    get_operating_hour as get_operating_hour_service,
+    update_operating_hours as update_operating_hours_service,
+    delete_operating_hours as delete_operating_hours_service
 )
-from src.services.infrastructure.auth import verify_vapi_secret
+from src.services.infrastructure.auth import require_restaurant_access
 from src.services.embeddings.service import add_embedding_task
 from src.core.middleware.request_id import get_request_id
 import logging
@@ -37,16 +37,17 @@ logger = logging.getLogger(__name__)
         500: {"description": "Failed to fetch operating hours"}
     }
 )
-def list_operating_hours_endpoint(
+def list_operating_hours(
+    request: Request,
     restaurant_id: str = Path(..., description="Restaurant UUID"),
     x_vapi_secret: Optional[str] = Header(
         None, alias="X-Vapi-Secret", description="Vapi webhook secret for authentication")
 ):
-    """List all operating hours for a restaurant."""
-    verify_vapi_secret(x_vapi_secret)
+    """List all operating hours for a restaurant. Accepts JWT or X-Vapi-Secret."""
+    require_restaurant_access(request, restaurant_id, x_vapi_secret)
 
     try:
-        items = list_operating_hours(restaurant_id)
+        items = list_operating_hours_service(restaurant_id)
         return items
     except Exception as e:
         logger.error(
@@ -69,17 +70,18 @@ def list_operating_hours_endpoint(
         500: {"description": "Failed to fetch operating hour"}
     }
 )
-def get_operating_hour_endpoint(
+def get_operating_hour(
+    request: Request,
     restaurant_id: str = Path(..., description="Restaurant UUID"),
     hour_id: str = Path(..., description="Operating hour UUID"),
     x_vapi_secret: Optional[str] = Header(
         None, alias="X-Vapi-Secret", description="Vapi webhook secret for authentication")
 ):
-    """Get a single operating hour by ID."""
-    verify_vapi_secret(x_vapi_secret)
+    """Get a single operating hour by ID. Accepts JWT or X-Vapi-Secret."""
+    require_restaurant_access(request, restaurant_id, x_vapi_secret)
 
     try:
-        item = get_operating_hour(restaurant_id, hour_id)
+        item = get_operating_hour_service(restaurant_id, hour_id)
         if not item:
             raise HTTPException(
                 status_code=404, detail="Operating hour not found")
@@ -107,7 +109,7 @@ def get_operating_hour_endpoint(
         500: {"description": "Failed to update operating hours"}
     }
 )
-def update_operating_hours_endpoint(
+def update_operating_hours(
     http_request: Request,
     background_tasks: BackgroundTasks,
     restaurant_id: str = Path(..., description="Restaurant UUID"),
@@ -115,12 +117,12 @@ def update_operating_hours_endpoint(
     x_vapi_secret: Optional[str] = Header(
         None, alias="X-Vapi-Secret", description="Vapi webhook secret for authentication")
 ):
-    """Update operating hours (bulk update). Automatically triggers background embedding generation."""
-    verify_vapi_secret(x_vapi_secret)
+    """Update operating hours (bulk update). Automatically triggers background embedding generation. Accepts JWT or X-Vapi-Secret."""
+    require_restaurant_access(http_request, restaurant_id, x_vapi_secret)
 
     try:
         hours_data = [hour.dict() for hour in request.hours]
-        items = update_operating_hours(restaurant_id, hours_data)
+        items = update_operating_hours_service(restaurant_id, hours_data)
 
         add_embedding_task(background_tasks, restaurant_id, "hours")
 
@@ -147,18 +149,18 @@ def update_operating_hours_endpoint(
         500: {"description": "Failed to delete operating hours"}
     }
 )
-def delete_operating_hours_endpoint(
+def delete_operating_hours(
     http_request: Request,
     background_tasks: BackgroundTasks,
     restaurant_id: str = Path(..., description="Restaurant UUID"),
     x_vapi_secret: Optional[str] = Header(
         None, alias="X-Vapi-Secret", description="Vapi webhook secret for authentication")
 ):
-    """Delete all operating hours for a restaurant. Automatically triggers background embedding generation."""
-    verify_vapi_secret(x_vapi_secret)
+    """Delete all operating hours for a restaurant. Automatically triggers background embedding generation. Accepts JWT or X-Vapi-Secret."""
+    require_restaurant_access(http_request, restaurant_id, x_vapi_secret)
 
     try:
-        delete_operating_hours(restaurant_id)
+        delete_operating_hours_service(restaurant_id)
 
         add_embedding_task(background_tasks, restaurant_id, "hours")
 

@@ -14,9 +14,12 @@ from src.api.menu_items import router as menu_items_router
 from src.api.modifiers import router as modifiers_router
 from src.api.operating_hours import router as operating_hours_router
 from src.api.delivery_zones import router as delivery_zones_router
+from src.api.categories import router as categories_router
 from src.core.config import get_settings
 from src.core.middleware.request_id import RequestIDMiddleware, get_request_id
+from src.core.middleware.auth import AuthMiddleware
 from src.core.logging_config import configure_logging
+from src.api import auth
 import logging
 
 settings = get_settings()
@@ -30,6 +33,9 @@ app = FastAPI(
     version="1.0.0"
 )
 
+# Add middleware - order matters!
+# Auth middleware must come before RequestID to set user state
+app.add_middleware(AuthMiddleware)
 app.add_middleware(RequestIDMiddleware)
 
 cors_origins = (
@@ -46,6 +52,7 @@ app.add_middleware(
 )
 
 app.include_router(health.router, prefix="/api", tags=["Health"])
+app.include_router(auth.router, prefix="/api/auth", tags=["Authentication"])
 app.include_router(vapi.router, prefix="/api/vapi", tags=["Vapi"])
 app.include_router(embeddings.router,
                    prefix="/api/embeddings", tags=["Embeddings"])
@@ -57,6 +64,7 @@ app.include_router(operating_hours_router, prefix="/api",
                    tags=["Operating Hours"])
 app.include_router(delivery_zones_router, prefix="/api",
                    tags=["Delivery Zones"])
+app.include_router(categories_router, prefix="/api", tags=["Categories"])
 
 
 @app.exception_handler(Exception)

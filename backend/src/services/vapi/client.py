@@ -447,6 +447,28 @@ class VapiClient:
 
         return response.json()
 
+    def get_call(self, call_id: str) -> Dict[str, Any]:
+        """
+        Get a single call by ID from Vapi API.
+
+        Args:
+            call_id: Vapi call ID
+
+        Returns:
+            Call data dictionary
+
+        Raises:
+            VapiAPIError: If request fails
+        """
+        response = self._request("GET", f"/call/{call_id}")
+
+        if response.status_code != 200:
+            error_msg = f"Failed to get call: {response.status_code} - {response.text}"
+            logger.error(error_msg)
+            raise VapiAPIError(error_msg)
+
+        return response.json()
+
     def delete_phone_number(self, phone_number_id: str) -> bool:
         """
         Delete a phone number by ID.

@@ -3,46 +3,46 @@
 
 tools:
   - name: get_menu_info
-    description: "Answer questions about menu items (names, descriptions, prices, availability)"
+    description: "Help customers find menu items, dishes, prices, what's available, categories, and what add-ons they can get with each item"
     parameters:
       type: object
       properties:
         query:
           type: string
-          description: "The customer's question about menu items"
+          description: "What the customer is asking about menu items, food, dishes, or what's available"
       required:
         - query
 
   - name: get_modifiers_info
-    description: "Answer questions about modifiers/options and their prices"
+    description: "Help with add-ons, extras, customizations, and what items they work with"
     parameters:
       type: object
       properties:
         query:
           type: string
-          description: "The customer's question about modifiers or options"
+          description: "What the customer is asking about add-ons, extras, or customizations"
       required:
         - query
 
   - name: get_hours_info
-    description: "Answer questions about operating hours, business hours, and when the restaurant is open"
+    description: "Help customers know when the restaurant is open or closed"
     parameters:
       type: object
       properties:
         query:
           type: string
-          description: "The customer's question about operating hours"
+          description: "What the customer is asking about hours, when you're open, or availability"
       required:
         - query
 
   - name: get_zones_info
-    description: "Answer questions about delivery zones, delivery fees, and delivery area information"
+    description: "Help with delivery areas, delivery fees, minimum orders, and whether their location is covered"
     parameters:
       type: object
       properties:
         query:
           type: string
-          description: "The customer's question about delivery zones and fees"
+          description: "What the customer is asking about delivery areas, fees, or coverage"
       required:
         - query
 

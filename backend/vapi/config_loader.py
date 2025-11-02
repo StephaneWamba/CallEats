@@ -104,8 +104,8 @@ def validate_config(config: Dict[str, Any], backend_url: Optional[str] = None) -
     else:
         if "system_prompt" not in config["prompts"]:
             errors.append("Prompts configuration missing 'system_prompt'")
-        if "first_message" not in config["prompts"]:
-            errors.append("Prompts configuration missing 'first_message'")
+        # first_message is optional - if null/empty, assistant will generate varied greetings
+        # No validation needed - it can be omitted or set to null
 
     if backend_url and not backend_url.startswith(("http://", "https://")):
         errors.append(

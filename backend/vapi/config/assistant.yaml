@@ -5,7 +5,7 @@ assistant:
   model:
     provider: "openai"
     model: "gpt-4o-mini"
-    temperature: 0.7
+    temperature: 0.8
   # Voice config removed - will use Vapi defaults
   # Additional assistant settings can be added here
   # timeout_seconds: 30

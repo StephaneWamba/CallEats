@@ -16,6 +16,10 @@ Complete reference for all environment variables used by the Restaurant Voice As
 | `TWILIO_ACCOUNT_SID`        | No       | Twilio Account SID (for phone automation) |
 | `TWILIO_AUTH_TOKEN`         | No       | Twilio Auth Token (for phone automation)  |
 | `ENVIRONMENT`               | No       | Environment type (default: `development`) |
+| `CACHE_TTL_SECONDS`         | No       | Cache TTL in seconds (default: `60`) |
+| `EMBEDDING_MODEL`            | No       | OpenAI embedding model (default: `text-embedding-3-small`) |
+| `EMBEDDING_DIMENSIONS`       | No       | Embedding vector dimensions (default: `1536`) |
+| `CORS_ORIGINS`               | No       | CORS allowed origins (default: `*`) |
 
 ## Detailed Documentation
 
@@ -189,6 +193,86 @@ Twilio Auth Token for authenticating Twilio API requests.
 - `scripts/create_twilio_phone_numbers.py` - Batch phone creation
 
 **Note**: Required together with `TWILIO_ACCOUNT_SID` for automatic phone provisioning.
+
+---
+
+### CACHE_TTL_SECONDS
+
+**Required**: No (optional)  
+**Default**: `60`  
+**Format**: Integer
+
+Time-to-live for in-memory cache entries in seconds. Affects how long search results are cached.
+
+**Used by:**
+
+- `src/services/infrastructure/cache.py` - Cache TTL configuration
+
+**Example:**
+
+```bash
+CACHE_TTL_SECONDS=120  # Cache for 2 minutes
+```
+
+---
+
+### EMBEDDING_MODEL
+
+**Required**: No (optional)  
+**Default**: `text-embedding-3-small`  
+**Format**: String
+
+OpenAI embedding model to use for generating vector embeddings.
+
+**Used by:**
+
+- `src/services/embeddings/service.py` - Embedding generation
+
+**Example:**
+
+```bash
+EMBEDDING_MODEL=text-embedding-3-large
+```
+
+---
+
+### EMBEDDING_DIMENSIONS
+
+**Required**: No (optional)  
+**Default**: `1536`  
+**Format**: Integer
+
+Number of dimensions for embedding vectors. Must match the embedding model's output dimensions.
+
+**Used by:**
+
+- `src/services/embeddings/service.py` - Vector dimension validation
+
+**Example:**
+
+```bash
+EMBEDDING_DIMENSIONS=1536  # For text-embedding-3-small
+```
+
+---
+
+### CORS_ORIGINS
+
+**Required**: No (optional)  
+**Default**: `*`  
+**Format**: Comma-separated list of URLs
+
+Allowed CORS origins. Use `*` for all origins (development only). For production, specify exact origins.
+
+**Used by:**
+
+- `src/main.py` - CORS middleware configuration
+
+**Example:**
+
+```bash
+CORS_ORIGINS=https://app.example.com,https://admin.example.com
+```
 
 ---
 

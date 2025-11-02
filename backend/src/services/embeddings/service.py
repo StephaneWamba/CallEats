@@ -126,10 +126,6 @@ async def trigger_embedding_generation(
             restaurant_id=restaurant_id,
             category=category
         )
-        logger.info(
-            f"Background embedding generation completed for restaurant {restaurant_id}, "
-            f"category {category}: {result.get('embeddings_generated', 0)} embeddings"
-        )
     except Exception as e:
         logger.error(
             f"Background embedding generation failed for restaurant {restaurant_id}, "
@@ -155,7 +151,4 @@ def add_embedding_task(
         trigger_embedding_generation,
         restaurant_id=restaurant_id,
         category=category
-    )
-    logger.debug(
-        f"Queued background embedding generation for restaurant {restaurant_id}, category {category}"
     )

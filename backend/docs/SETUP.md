@@ -43,11 +43,12 @@ See [Environment Variables](ENVIRONMENT_VARIABLES.md) for detailed documentation
 1. Go to [Supabase](https://supabase.com/) and create a new project
 2. Wait for the project to be fully provisioned
 
-### 2.2 Enable pgvector Extension
+### 2.2 Enable Extensions
 
 1. Navigate to **Database** → **Extensions** in Supabase Dashboard
-2. Search for `pgvector`
-3. Click **Enable** next to the `vector` extension
+2. Enable:
+   - `pgvector` - Vector similarity search (required)
+   - `postgis` - Spatial queries for delivery zones (auto-enabled by migration 020)
 
 ### 2.3 Run Migrations
 
@@ -55,11 +56,16 @@ Run the SQL migrations in order using Supabase SQL Editor:
 
 1. **Open SQL Editor** in Supabase Dashboard
 2. Run migrations in this order:
-   - `supabase/migrations/000_clean_schema.sql`
-   - `supabase/migrations/015_fix_service_role_policies.sql`
-   - `supabase/migrations/016_add_phone_mapping_table.sql`
+   - `supabase/migrations/000_clean_schema.sql` - Core schema (tables, indexes, functions)
+   - `supabase/migrations/015_fix_service_role_policies.sql` - RLS policies
+   - `supabase/migrations/016_add_phone_mapping_table.sql` - Phone mappings
+   - `supabase/migrations/017_add_cost_to_call_history.sql` - Call cost tracking
+   - `supabase/migrations/018_add_users_table.sql` - User authentication (JWT) - **Note**: If `017_add_users_table.sql` exists, skip it (use 018 only)
+   - `supabase/migrations/019_menu_item_modifiers.sql` - Modifier linking (junction table)
+   - `supabase/migrations/020_delivery_zones_geometry.sql` - PostGIS for zone boundaries (auto-enables PostGIS extension)
+   - `supabase/migrations/021_categories_table.sql` - Category management
 
-**Note**: Use `999_drop_all_tables.sql` only if you need to reset the entire database.
+**Note**: `999_drop_all_tables.sql` is only for complete database reset during development.
 
 ### 2.4 Get API Keys
 
@@ -155,25 +161,7 @@ This script:
 
 **Important**: Ensure `PUBLIC_BACKEND_URL` is set correctly before running this script.
 
-## Step 9: Seed Database (Testing)
-
-Create a test restaurant with sample data:
-
-```bash
-docker-compose exec api python -m scripts.seed_database \
-  --restaurant-name "Le Bistro Français" \
-  --generate-embeddings
-```
-
-This creates:
-
-- A restaurant record
-- Menu items, modifiers, operating hours, delivery zones
-- Vector embeddings for all data
-
-## Step 10: Assign Phone Number
-
-### Automatic Assignment (Recommended)
+## Step 9: Create Restaurant and Assign Phone
 
 Phone numbers are automatically assigned when creating restaurants via API:
 
@@ -187,17 +175,9 @@ curl -X POST http://localhost:8000/api/restaurants \
   }'
 ```
 
-### Manual Assignment
+**Note**: Use frontend application or API endpoints to manage restaurants, menu items, categories, modifiers, and delivery zones. All data operations automatically trigger embedding generation.
 
-For batch operations, use:
-
-```bash
-docker-compose exec api python -m scripts.create_twilio_phone_numbers
-```
-
-See [Phone Number Automation](PHONE_NUMBER_AUTOMATION.md) for details.
-
-## Step 11: Test Voice Call
+## Step 10: Test Voice Call
 
 1. Go to Vapi Dashboard → Your Assistant
 2. Click **Test Call**
@@ -222,7 +202,8 @@ See [Phone Number Automation](PHONE_NUMBER_AUTOMATION.md) for details.
 ### No Results from Voice Calls
 
 - Verify restaurant has data: Check Supabase tables
-- Generate embeddings: `POST /api/embeddings/generate`
+- Check embeddings exist: `document_embeddings` table should have records
+- Generate embeddings manually if needed: `POST /api/embeddings/generate`
 - Ensure phone number is mapped to restaurant in `restaurant_phone_mappings` table
 
 ### Database Errors
@@ -230,6 +211,23 @@ See [Phone Number Automation](PHONE_NUMBER_AUTOMATION.md) for details.
 - Verify all migrations are run
 - Check Supabase connection: Test `SUPABASE_URL` and keys
 - Ensure pgvector extension is enabled
+- Ensure PostGIS extension is enabled (for delivery zones)
+
+### Phone Assignment Fails
+
+- **Restaurant still created**: Phone assignment failure doesn't prevent restaurant creation
+- Check `VAPI_API_KEY` and `PUBLIC_BACKEND_URL` are set
+- Verify shared assistant exists (run `scripts/setup_vapi`)
+- For Twilio provisioning: Verify `TWILIO_ACCOUNT_SID` and `TWILIO_AUTH_TOKEN`
+- Check Twilio account quota (trial accounts limited to 1 number)
+- Manually assign phone later via Vapi Dashboard if needed
+
+### Embedding Generation Delays
+
+- Embeddings are generated asynchronously in background (doesn't block API)
+- Can take several seconds to minutes depending on data volume
+- Check logs for embedding generation errors (won't fail main request)
+- Manually trigger via `POST /api/embeddings/generate` if needed
 
 ## Next Steps
 

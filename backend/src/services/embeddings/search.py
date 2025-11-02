@@ -41,7 +41,7 @@ async def search_knowledge_base(
         return cached
 
     logger.debug(
-        f"Cache miss, generating embedding for query: '{query[:50]}...'")
+        f"Cache miss, generating embedding for query: '{query}' (restaurant_id={restaurant_id[:8]}..., category={category})")
     query_embedding = await generate_embedding(query)
 
     rpc_params = {
@@ -65,10 +65,6 @@ async def search_knowledge_base(
         for doc in response.data
     ]
 
-    logger.info(
-        f"Vector search: {len(results)} results for query='{query[:50]}...' "
-        f"(restaurant={restaurant_id}, category={category})"
-    )
     set_cached_result(restaurant_id, query, results, category)
 
     return results

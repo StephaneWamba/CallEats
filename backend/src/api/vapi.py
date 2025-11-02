@@ -1,58 +1,25 @@
 """
 Vapi webhook endpoints for voice assistant integration.
 
-Handles Function Tool calls from Vapi.ai, performs vector similarity search
-against restaurant-specific knowledge bases, and returns structured responses
-for text-to-speech synthesis.
+Thin routing layer that delegates to service functions for business logic.
 """
 from fastapi import APIRouter, Request, HTTPException, Header
 from typing import Optional
 from pydantic import ValidationError
 from src.models.vapi.requests import VapiRequest
-from src.models.vapi.webhooks import EndOfCallReportRequest
 from src.models.embeddings import CacheInvalidateRequest, GenerateEmbeddingsRequest
-from src.services.embeddings.search import search_knowledge_base
 from src.services.infrastructure.cache import clear_cache
 from src.core.config import get_settings
-from src.services.vapi.response import (
-    build_tool_result_with_items,
-    build_no_result,
-    build_structured_items,
-)
 from src.core.middleware.request_id import get_request_id
-from src.services.calls.webhook import parse_vapi_webhook, store_call_from_webhook
 from src.services.embeddings.service import generate_embeddings_for_restaurant
 from src.services.infrastructure.auth import verify_vapi_secret
+from src.services.vapi.server import handle_assistant_request, handle_end_of_call_report
+from src.services.vapi.knowledge import handle_knowledge_base_query
 import logging
-import asyncio
 import json
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
-
-TOOL_CATEGORY_MAP = {
-    "get_menu_info": "menu",
-    "get_modifiers_info": "modifiers",
-    "get_hours_info": "hours",
-    "get_zones_info": "zones",
-}
-
-
-def _extract_restaurant_id(
-    x_restaurant_id: Optional[str],
-    vapi_request: Optional[VapiRequest] = None
-) -> Optional[str]:
-    """Extract restaurant_id from request headers or metadata."""
-    body_restaurant_id = vapi_request.extract_restaurant_id() if vapi_request else None
-    restaurant_id = x_restaurant_id or body_restaurant_id
-    return restaurant_id.strip() if restaurant_id else None
-
-
-def _map_tool_to_category(tool_name: Optional[str]) -> Optional[str]:
-    """Map Vapi Function Tool name to internal content category."""
-    if not tool_name:
-        return None
-    return TOOL_CATEGORY_MAP.get(tool_name)
 
 
 @router.post(
@@ -100,130 +67,54 @@ async def generate_embeddings(
 
 
 @router.post(
-    "/assistant-request",
-    summary="Vapi Assistant Request",
-    description="Vapi Assistant Server URL endpoint. Extracts restaurant_id from phone number and returns it in metadata for subsequent tool calls.",
+    "/server",
+    summary="Vapi Unified Server Webhook",
+    description="Unified webhook endpoint that routes Vapi server events based on message type. Handles assistant-request, end-of-call-report, and other server events.",
     responses={
-        200: {"description": "Returns restaurant_id in metadata if phone mapping found"}
+        200: {"description": "Event processed successfully"}
     }
 )
-async def vapi_assistant_request(request: Request):
+async def vapi_unified_server(request: Request):
     """
-    Vapi Assistant Server URL endpoint.
+    Unified Vapi server webhook endpoint.
 
-    Extracts restaurant_id from phone number and returns it in metadata.
+    Routes messages based on message.type:
+    - "assistant-request" → processes restaurant_id mapping
+    - "end-of-call-report" → processes call data storage
+    - Other types → logged and returns empty response
     """
+    verify_vapi_secret(request.headers.get("X-Vapi-Secret"))
+
     try:
         body = await request.json()
-
         message_obj = body.get("message", {})
-        phone_number = None
-        if isinstance(message_obj, dict):
-            phone_value = message_obj.get(
-                "phoneNumber") or message_obj.get("phone_number")
-            if isinstance(phone_value, str):
-                phone_number = phone_value
-            elif isinstance(phone_value, dict):
-                phone_number = phone_value.get(
-                    "number") or phone_value.get("phoneNumber")
+        message_type = message_obj.get("type")
 
-            if not phone_number:
-                call_obj = message_obj.get("call", {})
-                if isinstance(call_obj, dict):
-                    phone_value = call_obj.get(
-                        "phoneNumber") or call_obj.get("phone_number")
-                    if isinstance(phone_value, str):
-                        phone_number = phone_value
-                    elif isinstance(phone_value, dict):
-                        phone_number = phone_value.get(
-                            "number") or phone_value.get("phoneNumber")
+        if message_type == "assistant-request":
+            return handle_assistant_request(message_obj)
 
-        if phone_number and isinstance(phone_number, str):
-            from src.services.phones.mapping import get_restaurant_id_from_phone
-            restaurant_id = get_restaurant_id_from_phone(phone_number)
-            if restaurant_id:
-                logger.info(
-                    f"Assistant request processed: phone={phone_number}, restaurant_id={restaurant_id}",
-                    extra={"request_id": get_request_id(request)}
-                )
-                return {
-                    "metadata": {
-                        "restaurant_id": restaurant_id,
-                        "phoneNumber": phone_number
-                    }
-                }
-    except Exception as e:
-        request_id = get_request_id(request)
-        logger.error(
-            f"Assistant request error: {e}",
-            exc_info=True,
-            extra={"request_id": request_id}
-        )
+        elif message_type == "status-update":
+            from src.services.vapi.server import handle_status_update
+            return handle_status_update(message_obj)
 
-    return {}
+        elif message_type == "end-of-call-report":
+            return handle_end_of_call_report(message_obj)
 
-
-@router.post(
-    "/end-of-call-report",
-    summary="Vapi End-of-Call-Report Webhook",
-    description="Receives call completion webhooks from Vapi. Stores call data including transcript and cost in database.",
-    responses={
-        200: {"description": "Call data stored successfully"},
-        401: {"description": "Invalid authentication"},
-        422: {"description": "Invalid webhook payload"},
-        500: {"description": "Failed to process webhook"}
-    }
-)
-async def end_of_call_report(
-    request: Request,
-    x_vapi_secret: Optional[str] = Header(
-        None, alias="X-Vapi-Secret", description="Vapi webhook secret for authentication")
-):
-    """
-    Vapi end-of-call-report webhook endpoint.
-
-    Receives call completion data from Vapi when a call ends.
-    Extracts essential data (phone number, timestamps, duration, transcript, cost)
-    and stores it in the call_history table after mapping phone to restaurant_id.
-    """
-    verify_vapi_secret(x_vapi_secret)
-
-    try:
-        body = await request.json()
-
-        # Parse webhook payload
-        parsed_data = parse_vapi_webhook(body)
-
-        # Store call record (maps phone to restaurant_id automatically)
-        call_id = store_call_from_webhook(parsed_data)
-
-        if call_id:
-            return {"success": True, "call_id": call_id}
         else:
-            return {"success": False, "message": "Phone number not mapped to restaurant"}
+            logger.debug(
+                f"Unhandled Vapi server event: type={message_type}",
+                extra={"request_id": get_request_id(request)}
+            )
+            return {}
 
-    except ValidationError as e:
-        request_id = get_request_id(request)
-        logger.error(
-            f"Invalid webhook payload: {e.errors()}",
-            exc_info=True,
-            extra={"request_id": request_id}
-        )
-        raise HTTPException(
-            status_code=422,
-            detail=f"Invalid webhook payload: {e.errors()}"
-        )
     except Exception as e:
         request_id = get_request_id(request)
         logger.error(
-            f"Error processing end-of-call webhook: {e}",
+            f"Error processing Vapi server webhook: {e}",
             exc_info=True,
             extra={"request_id": request_id}
         )
-        raise HTTPException(
-            status_code=500,
-            detail="Failed to process webhook"
-        )
+        return {}
 
 
 @router.post(
@@ -246,6 +137,7 @@ async def vapi_knowledge_base(
 ):
     """Main Vapi webhook endpoint for Function Tool calls."""
     settings = get_settings()
+    request_id = get_request_id(request)
 
     try:
         if not x_vapi_secret or x_vapi_secret != settings.vapi_secret_key:
@@ -262,118 +154,21 @@ async def vapi_knowledge_base(
                 detail=f"Invalid request format: {str(e)}"
             )
 
-        query_text = vapi_request.extract_query()
-        tool_call_id = vapi_request.extract_tool_call_id()
-        tool_name = vapi_request.extract_tool_name()
-
-        if not query_text:
-            raise HTTPException(
-                status_code=422, detail="Missing query parameter")
-
-        if not tool_call_id:
-            raise HTTPException(status_code=422, detail="Missing toolCallId")
-
-        restaurant_id = (x_restaurant_id or
-                         dict(request.query_params).get("restaurant_id") or
-                         _extract_restaurant_id(None, vapi_request))
-
-        request_id = get_request_id(request)
-        if restaurant_id:
-            logger.info(
-                f"Processing knowledge-base request: tool={tool_name}, query='{query_text[:50]}...', restaurant_id={restaurant_id}",
-                extra={"request_id": request_id}
-            )
-
-        if not restaurant_id:
-            try:
-                from src.services.phones.mapping import get_restaurant_id_from_phone
-
-                body_dict = json.loads(body_bytes.decode('utf-8'))
-                message_obj = body_dict.get("message", {})
-                phone_number = None
-
-                if isinstance(message_obj, dict):
-                    phone_value = message_obj.get(
-                        "phoneNumber") or message_obj.get("phone_number")
-                    if isinstance(phone_value, str):
-                        phone_number = phone_value
-                    elif isinstance(phone_value, dict):
-                        phone_number = phone_value.get(
-                            "number") or phone_value.get("phoneNumber")
-
-                    if not phone_number:
-                        call_obj = message_obj.get("call", {})
-                        if isinstance(call_obj, dict):
-                            phone_value = call_obj.get(
-                                "phoneNumber") or call_obj.get("phone_number")
-                            if isinstance(phone_value, str):
-                                phone_number = phone_value
-                            elif isinstance(phone_value, dict):
-                                phone_number = phone_value.get(
-                                    "number") or phone_value.get("phoneNumber")
-
-                if phone_number and isinstance(phone_number, str):
-                    restaurant_id = get_restaurant_id_from_phone(phone_number)
-                    if restaurant_id:
-                        logger.info(
-                            f"Restaurant ID resolved from phone: {phone_number[:10]}... -> {restaurant_id}",
-                            extra={"request_id": request_id}
-                        )
-            except Exception as e:
-                request_id = get_request_id(request)
-                logger.error(
-                    f"Error extracting restaurant_id: {e}",
-                    exc_info=True,
-                    extra={"request_id": request_id}
-                )
-
-        if not restaurant_id:
-            raise HTTPException(
-                status_code=422,
-                detail="restaurant_id is required. Provide via X-Restaurant-Id header, query param, metadata.restaurant_id, or ensure phone number is in call metadata."
-            )
-
-        category = _map_tool_to_category(tool_name)
-
         try:
-            results = await asyncio.wait_for(
-                search_knowledge_base(
-                    query=query_text,
-                    restaurant_id=restaurant_id,
-                    category=category,
-                    limit=5
-                ),
-                timeout=15.0
-            )
-            logger.info(
-                f"Vector search completed: found {len(results)} results for category={category}",
-                extra={"request_id": request_id}
-            )
-        except asyncio.TimeoutError:
-            return build_no_result(
-                tool_call_id,
-                "I'm experiencing a delay retrieving that information. Please try again in a moment."
-            )
+            body_dict = json.loads(body_bytes.decode('utf-8'))
+            message_obj = body_dict.get("message", {})
+        except Exception:
+            message_obj = None
 
-        if not results:
-            logger.info(
-                f"No results found for query: '{query_text[:50]}...' (category={category})",
-                extra={"request_id": request_id}
-            )
-            return build_no_result(tool_call_id, category=category)
-
-        response_text = "\n\n".join([doc["content"] for doc in results[:3]])
-        items = build_structured_items(results, category)
-
-        logger.info(
-            f"Returning {len(items)} items to Vapi for tool_call_id={tool_call_id}",
-            extra={"request_id": request_id}
+        result = await handle_knowledge_base_query(
+            vapi_request=vapi_request,
+            x_restaurant_id=x_restaurant_id,
+            query_params=dict(request.query_params),
+            message_obj=message_obj
         )
-
-        return build_tool_result_with_items(tool_call_id, response_text, items)
+        return result
 
     except ValidationError as e:
-        request_id = get_request_id(request)
         logger.error(
             f"Validation error: {e.errors()}",
             exc_info=True,
@@ -383,8 +178,9 @@ async def vapi_knowledge_base(
             status_code=422, detail=f"Invalid request format: {e.errors()}")
     except HTTPException:
         raise
+    except ValueError as e:
+        raise HTTPException(status_code=422, detail=str(e))
     except Exception as e:
-        request_id = get_request_id(request)
         logger.error(
             f"Error processing knowledge-base request: {e}",
             exc_info=True,

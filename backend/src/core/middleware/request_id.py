@@ -19,7 +19,7 @@ class RequestIDMiddleware(BaseHTTPMiddleware):
 
         request.state.request_id = request_id
 
-        logger.info(
+        logger.debug(
             f"{request.method} {request.url.path}",
             extra={"request_id": request_id}
         )

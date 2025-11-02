@@ -14,8 +14,10 @@ class MenuItemResponse(BaseModel):
     description: Optional[str] = Field(
         None, description="Item description", example="Freshly baked butter croissant")
     price: Decimal = Field(..., description="Item price", example=4.50)
-    category: str = Field(
-        "General", description="Item category", example="Pastries")
+    category_id: Optional[str] = Field(
+        None, description="Category UUID (foreign key)", example="04529052-b3dd-43c1-a534-c18d8c0f4c6d")
+    category: Optional[str] = Field(
+        None, description="Category name (legacy field, kept for backward compatibility)", example="Pastries")
     available: bool = Field(
         True, description="Whether item is currently available")
     created_at: str = Field(..., description="ISO 8601 timestamp",
@@ -45,8 +47,8 @@ class CreateMenuItemRequest(BaseModel):
     description: Optional[str] = Field(
         None, description="Item description", example="Freshly baked butter croissant")
     price: Decimal = Field(..., description="Item price", ge=0, example=4.50)
-    category: str = Field(
-        "General", description="Item category", example="Pastries")
+    category_id: Optional[str] = Field(
+        None, description="Category UUID (foreign key)", example="04529052-b3dd-43c1-a534-c18d8c0f4c6d")
     available: bool = Field(
         True, description="Whether item is currently available")
 
@@ -70,8 +72,8 @@ class UpdateMenuItemRequest(BaseModel):
         None, description="Item description", example="Freshly baked butter croissant")
     price: Optional[Decimal] = Field(
         None, description="Item price", ge=0, example=4.50)
-    category: Optional[str] = Field(
-        None, description="Item category", example="Pastries")
+    category_id: Optional[str] = Field(
+        None, description="Category UUID (foreign key)", example="04529052-b3dd-43c1-a534-c18d8c0f4c6d")
     available: Optional[bool] = Field(
         None, description="Whether item is currently available")
 

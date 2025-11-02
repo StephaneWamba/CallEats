@@ -1,6 +1,6 @@
 """Pydantic models for delivery zones API."""
 from pydantic import BaseModel, Field
-from typing import Optional
+from typing import Optional, Dict, Any
 from decimal import Decimal
 
 
@@ -12,6 +12,7 @@ class DeliveryZoneResponse(BaseModel):
     description: Optional[str] = Field(None, description="Zone description", example="Downtown area delivery")
     delivery_fee: Decimal = Field(..., description="Delivery fee for this zone", example=5.00)
     min_order: Optional[Decimal] = Field(None, description="Minimum order amount for delivery", example=15.00)
+    boundary: Optional[Dict[str, Any]] = Field(None, description="GeoJSON boundary polygon (if set)", example=None)
     created_at: str = Field(..., description="ISO 8601 timestamp", example="2025-01-01T12:00:00Z")
     updated_at: str = Field(..., description="ISO 8601 timestamp", example="2025-01-01T12:00:00Z")
 
@@ -61,6 +62,24 @@ class UpdateDeliveryZoneRequest(BaseModel):
                 "zone_name": "Downtown",
                 "delivery_fee": 6.00,
                 "min_order": 20.00
+            }
+        }
+
+
+class SetBoundaryRequest(BaseModel):
+    """Request model for setting zone boundary."""
+    boundary: Dict[str, Any] = Field(..., description="GeoJSON Polygon or Feature with Polygon", example={
+        "type": "Polygon",
+        "coordinates": [[[-74.0060, 40.7128], [-73.9950, 40.7128], [-73.9950, 40.7200], [-74.0060, 40.7200], [-74.0060, 40.7128]]]
+    })
+
+    class Config:
+        json_schema_extra = {
+            "example": {
+                "boundary": {
+                    "type": "Polygon",
+                    "coordinates": [[[-74.0060, 40.7128], [-73.9950, 40.7128], [-73.9950, 40.7200], [-74.0060, 40.7200], [-74.0060, 40.7128]]]
+                }
             }
         }
 

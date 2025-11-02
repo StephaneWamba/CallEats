@@ -4,14 +4,13 @@ Vapi Setup Script - Creates shared assistant and tools for restaurant voice assi
 
 This script loads configuration from YAML files and creates/manages Vapi resources.
 """
+from src.services.vapi.manager import VapiResourceManager
 from pathlib import Path
 import argparse
 import sys
 import os
-from src.services.vapi.manager import VapiResourceManager
 
-
-# Add backend root to path for vapi imports
+# Add backend root to path for vapi imports BEFORE importing src modules
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 
@@ -156,6 +155,8 @@ Examples:
         print_header("Setup Complete!")
         print(f"Assistant ID: {assistant_id}")
         print(f"\nTest at: https://dashboard.vapi.ai/assistant/{assistant_id}")
+        print("\n✅ Webhook Configuration:")
+        print(f"  - Unified Server: {backend_url}/api/vapi/server")
         print("\nConfig files:")
         for config_file in ["tools.yaml", "assistant.yaml", "prompts.yaml"]:
             print(f"  - vapi/config/{config_file}")
