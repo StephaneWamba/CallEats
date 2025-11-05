@@ -1,3 +1,0 @@
-"""Vapi-related models."""
-
-
