@@ -9,6 +9,13 @@ frontend/.env.local
 private/
 render.yaml
 
+# Old backend folder
+backend/
+
+# Seed scripts (contain sensitive data)
+backend_2/scripts/seed_database.py
+backend_2/scripts/generate_embeddings.py
+
 # Python
 __pycache__/
 *.py[cod]
