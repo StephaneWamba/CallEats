@@ -9,6 +9,8 @@ Endpoints:
     - POST /api/restaurants/{restaurant_id}/menu-items: Create menu item
     - PUT /api/restaurants/{restaurant_id}/menu-items/{item_id}: Update menu item
     - DELETE /api/restaurants/{restaurant_id}/menu-items/{item_id}: Delete menu item
+    - POST /api/restaurants/{restaurant_id}/menu-items/{item_id}/image: Upload menu item image
+    - DELETE /api/restaurants/{restaurant_id}/menu-items/{item_id}/image: Delete menu item image
     - POST /api/restaurants/{restaurant_id}/menu-items/{item_id}/modifiers: Link modifier
     - DELETE /api/restaurants/{restaurant_id}/menu-items/{item_id}/modifiers/{modifier_id}: Unlink modifier
 
@@ -29,7 +31,7 @@ Usage:
         POST /api/restaurants/{restaurant_id}/menu-items
         Body: {"name": "...", "description": "...", "price": 12.99, "category_id": "..."}
 """
-from fastapi import APIRouter, HTTPException, Header, Path, Request, BackgroundTasks
+from fastapi import APIRouter, HTTPException, Header, Path, Request, BackgroundTasks, UploadFile, File
 from typing import Optional, List
 from restaurant_voice_assistant.shared.models.menu_items import (
     MenuItemResponse,
@@ -46,6 +48,10 @@ from restaurant_voice_assistant.domain.menu.items import (
     create_menu_item as create_menu_item_service,
     update_menu_item as update_menu_item_service,
     delete_menu_item as delete_menu_item_service
+)
+from restaurant_voice_assistant.domain.menu.images import (
+    upload_menu_item_image,
+    delete_menu_item_image
 )
 from restaurant_voice_assistant.domain.menu.item_modifiers import (
     link_modifier_to_item,
@@ -371,4 +377,110 @@ def unlink_modifier(
         )
         raise HTTPException(
             status_code=500, detail="Failed to unlink modifier")
+
+
+@router.post(
+    "/restaurants/{restaurant_id}/menu-items/{item_id}/image",
+    summary="Upload Menu Item Image",
+    description="Upload an image for a menu item. Stores image in Supabase Storage and updates database.",
+    responses={
+        200: {"description": "Image uploaded successfully"},
+        400: {"description": "Invalid file type or size"},
+        401: {"description": "Invalid authentication"},
+        404: {"description": "Menu item not found"},
+        500: {"description": "Failed to upload image"}
+    }
+)
+async def upload_image(
+    http_request: Request,
+    restaurant_id: str = Path(..., description="Restaurant UUID"),
+    item_id: str = Path(..., description="Menu item UUID"),
+    file: UploadFile = File(...,
+                            description="Image file (jpg, png, webp, max 5MB)"),
+    x_vapi_secret: Optional[str] = Header(
+        None, alias="X-Vapi-Secret", description="Vapi webhook secret for authentication")
+):
+    """Upload an image for a menu item. Accepts JWT or X-Vapi-Secret."""
+    require_restaurant_access(http_request, restaurant_id, x_vapi_secret)
+
+    try:
+        # Verify menu item exists
+        item = get_menu_item_service(restaurant_id, item_id)
+        if not item:
+            raise HTTPException(
+                status_code=404, detail="Menu item not found")
+
+        # Read file content
+        file_content = await file.read()
+
+        # Upload image
+        image_url = upload_menu_item_image(
+            restaurant_id=restaurant_id,
+            item_id=item_id,
+            file_content=file_content,
+            filename=file.filename or "image.jpg",
+            content_type=file.content_type
+        )
+
+        return {
+            "image_url": image_url,
+            "message": "Image uploaded successfully"
+        }
+    except HTTPException:
+        raise
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        request_id = get_request_id(http_request)
+        logger.error(
+            f"Error uploading image for menu item {item_id}: {e}",
+            exc_info=True,
+            extra={"request_id": request_id}
+        )
+        raise HTTPException(
+            status_code=500, detail="Failed to upload image")
+
+
+@router.delete(
+    "/restaurants/{restaurant_id}/menu-items/{item_id}/image",
+    summary="Delete Menu Item Image",
+    description="Delete an image for a menu item. Removes image from Supabase Storage and updates database.",
+    responses={
+        200: {"description": "Image deleted successfully"},
+        401: {"description": "Invalid authentication"},
+        404: {"description": "Menu item or image not found"},
+        500: {"description": "Failed to delete image"}
+    }
+)
+def delete_image(
+    http_request: Request,
+    restaurant_id: str = Path(..., description="Restaurant UUID"),
+    item_id: str = Path(..., description="Menu item UUID"),
+    x_vapi_secret: Optional[str] = Header(
+        None, alias="X-Vapi-Secret", description="Vapi webhook secret for authentication")
+):
+    """Delete an image for a menu item. Accepts JWT or X-Vapi-Secret."""
+    require_restaurant_access(http_request, restaurant_id, x_vapi_secret)
+
+    try:
+        deleted = delete_menu_item_image(restaurant_id, item_id)
+        if not deleted:
+            raise HTTPException(
+                status_code=404, detail="Image not found")
+
+        return {
+            "success": True,
+            "message": "Image deleted successfully"
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        request_id = get_request_id(http_request)
+        logger.error(
+            f"Error deleting image for menu item {item_id}: {e}",
+            exc_info=True,
+            extra={"request_id": request_id}
+        )
+        raise HTTPException(
+            status_code=500, detail="Failed to delete image")
 

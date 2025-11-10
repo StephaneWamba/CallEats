@@ -81,3 +81,40 @@ class UpdateRestaurantRequest(BaseModel):
                 "name": "Le Bistro Français - Updated"
             }
         }
+
+
+class RestaurantStatsResponse(BaseModel):
+    """Response model for restaurant dashboard statistics."""
+    total_calls_today: int = Field(
+        ..., description="Total number of calls today", example=15)
+    menu_items_count: int = Field(
+        ..., description="Total number of menu items", example=24)
+    phone_status: str = Field(
+        ..., description="Phone status: 'active' or 'inactive'", example="active")
+    categories_count: int = Field(
+        ..., description="Total number of categories", example=5)
+
+    class Config:
+        json_schema_extra = {
+            "example": {
+                "total_calls_today": 15,
+                "menu_items_count": 24,
+                "phone_status": "active",
+                "categories_count": 5
+            }
+        }
+
+
+class DeleteRestaurantResponse(BaseModel):
+    """Response model for restaurant deletion."""
+    success: bool = Field(..., description="Whether deletion was successful", example=True)
+    message: str = Field(..., description="Deletion message", 
+                         example="Restaurant and all associated data deleted successfully")
+
+    class Config:
+        json_schema_extra = {
+            "example": {
+                "success": True,
+                "message": "Restaurant and all associated data deleted successfully"
+            }
+        }

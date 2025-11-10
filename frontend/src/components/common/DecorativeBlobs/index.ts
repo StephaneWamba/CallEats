@@ -1,0 +1,2 @@
+export { DecorativeBlobs } from './DecorativeBlobs';
+

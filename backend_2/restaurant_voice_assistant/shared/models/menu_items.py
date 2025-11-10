@@ -38,6 +38,8 @@ class MenuItemResponse(BaseModel):
         None, description="Category name (legacy field, kept for backward compatibility)", example="Pastries")
     available: bool = Field(
         True, description="Whether item is currently available")
+    image_url: Optional[str] = Field(
+        None, description="URL to menu item image", example="https://storage.supabase.co/object/public/menu-images/restaurant-id/item-id/image.jpg")
     created_at: str = Field(..., description="ISO 8601 timestamp",
                             example="2025-01-01T12:00:00Z")
     updated_at: str = Field(..., description="ISO 8601 timestamp",
@@ -53,6 +55,7 @@ class MenuItemResponse(BaseModel):
                 "price": 4.50,
                 "category": "Pastries",
                 "available": True,
+                "image_url": "https://storage.supabase.co/object/public/menu-images/restaurant-id/item-id/image.jpg",
                 "created_at": "2025-01-01T12:00:00Z",
                 "updated_at": "2025-01-01T12:00:00Z"
             }
@@ -103,4 +106,3 @@ class UpdateMenuItemRequest(BaseModel):
                 "available": False
             }
         }
-

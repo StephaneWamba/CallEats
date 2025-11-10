@@ -4,29 +4,37 @@ This module provides business logic for restaurant management including:
     - Restaurant CRUD operations
     - Phone number assignment integration
     - Multi-tenant data isolation
+    - Dashboard statistics
 
 Key Features:
     - Automatic phone number assignment on creation
     - Restaurant-scoped queries (multi-tenancy)
     - Phone number lookup and association
     - API key generation
+    - Dashboard statistics aggregation
 
 Usage:
     from restaurant_voice_assistant.domain.restaurants.service import (
         create_restaurant,
         get_restaurant,
-        update_restaurant
+        update_restaurant,
+        get_restaurant_stats
     )
     
     restaurant = create_restaurant(
         name="My Restaurant",
         assign_phone=True
     )
+    stats = get_restaurant_stats(restaurant_id="...")
 """
 from typing import Optional, Dict, Any
 from uuid import uuid4
+from datetime import datetime, timezone
 from restaurant_voice_assistant.infrastructure.database.client import get_supabase_service_client
 from restaurant_voice_assistant.domain.phones.service import assign_phone_to_restaurant
+from restaurant_voice_assistant.core.config import get_settings
+from restaurant_voice_assistant.infrastructure.vapi.client import VapiClient
+from restaurant_voice_assistant.core.exceptions import VapiAPIError
 import logging
 
 logger = logging.getLogger(__name__)
@@ -193,5 +201,140 @@ def update_restaurant(
     except Exception as e:
         logger.error(
             f"Error updating restaurant {restaurant_id}: {e}", exc_info=True)
+        raise
+
+
+def get_restaurant_stats(restaurant_id: str) -> Dict[str, Any]:
+    """Get dashboard statistics for a restaurant.
+
+    Args:
+        restaurant_id: Restaurant UUID
+
+    Returns:
+        Dictionary with statistics:
+        - total_calls_today: Count of calls today
+        - menu_items_count: Total menu items
+        - phone_status: "active" or "inactive"
+        - categories_count: Total categories
+
+    Raises:
+        Exception: If database operation fails
+    """
+    supabase = get_supabase_service_client()
+
+    try:
+        # Get start of today (UTC)
+        today_start = datetime.now(timezone.utc).replace(
+            hour=0, minute=0, second=0, microsecond=0
+        )
+        today_start_iso = today_start.isoformat()
+
+        # Count calls today
+        calls_resp = supabase.table("call_history").select(
+            "id", count="exact"
+        ).eq("restaurant_id", restaurant_id).gte(
+            "started_at", today_start_iso
+        ).execute()
+        total_calls_today = calls_resp.count if hasattr(calls_resp, 'count') else len(calls_resp.data or [])
+
+        # Count menu items
+        menu_items_resp = supabase.table("menu_items").select(
+            "id", count="exact"
+        ).eq("restaurant_id", restaurant_id).execute()
+        menu_items_count = menu_items_resp.count if hasattr(menu_items_resp, 'count') else len(menu_items_resp.data or [])
+
+        # Check phone status
+        phone_mappings = supabase.table("restaurant_phone_mappings").select(
+            "phone_number"
+        ).eq("restaurant_id", restaurant_id).limit(1).execute()
+        phone_status = "active" if phone_mappings.data else "inactive"
+
+        # Count categories
+        categories_resp = supabase.table("categories").select(
+            "id", count="exact"
+        ).eq("restaurant_id", restaurant_id).execute()
+        categories_count = categories_resp.count if hasattr(categories_resp, 'count') else len(categories_resp.data or [])
+
+        return {
+            "total_calls_today": total_calls_today,
+            "menu_items_count": menu_items_count,
+            "phone_status": phone_status,
+            "categories_count": categories_count
+        }
+    except Exception as e:
+        logger.error(
+            f"Error fetching stats for restaurant {restaurant_id}: {e}", exc_info=True)
+        raise
+
+
+def delete_restaurant(restaurant_id: str) -> bool:
+    """Delete a restaurant and all associated data.
+
+    Cascade deletion order:
+    1. Get phone number from restaurant_phone_mappings
+    2. Unassign phone number from Vapi assistant (set assistantId to None)
+    3. Delete restaurant (cascade delete handles all related records)
+
+    Args:
+        restaurant_id: Restaurant UUID
+
+    Returns:
+        True if deleted successfully, False if not found
+
+    Raises:
+        Exception: If deletion fails
+    """
+    supabase = get_supabase_service_client()
+
+    try:
+        # Step 1: Get phone number before deletion
+        phone_mappings = supabase.table("restaurant_phone_mappings").select(
+            "phone_number"
+        ).eq("restaurant_id", restaurant_id).limit(1).execute()
+
+        phone_number = None
+        if phone_mappings.data:
+            phone_number = phone_mappings.data[0].get("phone_number")
+
+        # Step 2: Unassign phone number from Vapi assistant if exists
+        if phone_number:
+            try:
+                settings = get_settings()
+                if settings.vapi_api_key:
+                    client = VapiClient(api_key=settings.vapi_api_key)
+                    phone_numbers = client.list_phone_numbers()
+
+                    # Find matching phone number
+                    phone_clean = phone_number.replace(" ", "").replace(
+                        "(", "").replace(")", "").replace("-", "")
+                    
+                    for pn in phone_numbers:
+                        pn_number = pn.get("number", "")
+                        pn_clean = pn_number.replace(" ", "").replace(
+                            "(", "").replace(")", "").replace("-", "")
+                        
+                        if pn_clean == phone_clean or pn_clean in phone_clean or phone_clean in pn_clean:
+                            phone_id = pn.get("id")
+                            if phone_id:
+                                # Unassign from assistant (set assistantId to None)
+                                client.update_phone_number(phone_id, {"assistantId": None})
+                                logger.info(f"Unassigned phone number {phone_number} from Vapi assistant")
+                            break
+            except VapiAPIError as e:
+                logger.warning(f"Failed to unassign phone number from Vapi: {e}")
+            except Exception as e:
+                logger.warning(f"Error unassigning phone number: {e}")
+
+        # Step 3: Delete restaurant (cascade delete handles all related records)
+        resp = supabase.table("restaurants").delete().eq("id", restaurant_id).execute()
+
+        if resp.data:
+            logger.info(f"Successfully deleted restaurant {restaurant_id}")
+            return True
+        return False
+
+    except Exception as e:
+        logger.error(
+            f"Error deleting restaurant {restaurant_id}: {e}", exc_info=True)
         raise
 

@@ -52,7 +52,7 @@ def list_menu_items(restaurant_id: str) -> List[Dict[str, Any]]:
 
     try:
         resp = supabase.table("menu_items").select(
-            "id, restaurant_id, name, description, price, category_id, category, available, created_at, updated_at"
+            "id, restaurant_id, name, description, price, category_id, category, available, image_url, created_at, updated_at"
         ).eq("restaurant_id", restaurant_id).order("category").order("name").execute()
 
         # Fetch category names for items that have category_id
@@ -96,7 +96,7 @@ def get_menu_item(restaurant_id: str, item_id: str) -> Optional[Dict[str, Any]]:
 
     try:
         resp = supabase.table("menu_items").select(
-            "id, restaurant_id, name, description, price, category_id, category, available, created_at, updated_at"
+            "id, restaurant_id, name, description, price, category_id, category, available, image_url, created_at, updated_at"
         ).eq("restaurant_id", restaurant_id).eq("id", item_id).limit(1).execute()
 
         if resp.data:

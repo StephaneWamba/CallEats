@@ -20,6 +20,8 @@ Environment Variables:
     EMBEDDING_MODEL: OpenAI embedding model (default: text-embedding-3-small)
     EMBEDDING_DIMENSIONS: Embedding vector dimensions (default: 1536)
     CORS_ORIGINS: CORS allowed origins (default: *)
+    FRONTEND_URL: Frontend URL for password reset redirects (optional)
+    PUBLIC_BACKEND_URL: Public backend URL, fallback for redirects (optional)
 
 Usage:
     from restaurant_voice_assistant.core.config import get_settings
@@ -30,6 +32,7 @@ Usage:
 from pydantic_settings import BaseSettings
 from functools import lru_cache
 from pydantic import ConfigDict
+from typing import Optional
 
 
 class Settings(BaseSettings):
@@ -45,6 +48,8 @@ class Settings(BaseSettings):
     embedding_model: str = "text-embedding-3-small"
     embedding_dimensions: int = 1536
     cors_origins: str = "*"
+    frontend_url: Optional[str] = None  # Frontend URL for password reset redirects
+    public_backend_url: Optional[str] = None  # Public backend URL (fallback for redirects)
 
     model_config = ConfigDict(
         env_file=".env",

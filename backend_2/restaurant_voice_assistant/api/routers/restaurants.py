@@ -6,8 +6,9 @@ including automatic phone number assignment and phone connectivity testing.
 Endpoints:
     - POST /api/restaurants: Create restaurant with optional phone assignment
     - GET /api/restaurants/{restaurant_id}: Get restaurant details
+    - GET /api/restaurants/me: Get current user's restaurant (JWT only)
     - PUT /api/restaurants/{restaurant_id}: Update restaurant information
-    - GET /api/restaurants/{restaurant_id}/phone: Get phone details and test connectivity
+    - GET /api/restaurants/{restaurant_id}/stats: Get dashboard statistics
 
 Authentication:
     All endpoints accept JWT (frontend users) or X-Vapi-Secret (admin/scripts).
@@ -29,16 +30,21 @@ from typing import Optional
 from restaurant_voice_assistant.shared.models.restaurants import (
     CreateRestaurantRequest,
     UpdateRestaurantRequest,
-    RestaurantResponse
+    RestaurantResponse,
+    RestaurantStatsResponse,
+    DeleteRestaurantResponse
 )
 from restaurant_voice_assistant.domain.restaurants.service import (
     create_restaurant as create_restaurant_service,
     get_restaurant as get_restaurant_service,
-    update_restaurant as update_restaurant_service
+    update_restaurant as update_restaurant_service,
+    get_restaurant_stats as get_restaurant_stats_service,
+    delete_restaurant as delete_restaurant_service
 )
 from restaurant_voice_assistant.infrastructure.auth.service import (
     require_auth,
-    require_restaurant_access
+    require_restaurant_access,
+    get_restaurant_id
 )
 from restaurant_voice_assistant.api.middleware.request_id import get_request_id
 import logging
@@ -146,6 +152,55 @@ def get_restaurant(
             status_code=500, detail="Failed to fetch restaurant")
 
 
+@router.get(
+    "/restaurants/me",
+    response_model=RestaurantResponse,
+    summary="Get Current User's Restaurant",
+    description="Get the authenticated user's restaurant automatically (no restaurant_id needed).",
+    responses={
+        200: {"description": "Restaurant retrieved successfully"},
+        401: {"description": "Invalid authentication"},
+        403: {"description": "User not associated with a restaurant"},
+        404: {"description": "Restaurant not found"},
+        500: {"description": "Failed to fetch restaurant"}
+    }
+)
+def get_my_restaurant(request: Request):
+    """Get the current authenticated user's restaurant.
+
+    Extracts restaurant_id from JWT token automatically.
+    Only accepts JWT authentication (not X-Vapi-Secret).
+    """
+    # Get restaurant_id from JWT token
+    restaurant_id = get_restaurant_id(request)
+
+    try:
+        restaurant_data = get_restaurant_service(restaurant_id)
+        if not restaurant_data:
+            raise HTTPException(
+                status_code=404, detail="Restaurant not found")
+
+        return RestaurantResponse(
+            id=restaurant_data["id"],
+            name=restaurant_data["name"],
+            api_key=restaurant_data["api_key"],
+            phone_number=restaurant_data["phone_number"],
+            created_at=restaurant_data["created_at"],
+            updated_at=restaurant_data.get("updated_at")
+        )
+    except HTTPException:
+        raise
+    except Exception as e:
+        request_id = get_request_id(request)
+        logger.error(
+            f"Error fetching restaurant for current user: {e}",
+            exc_info=True,
+            extra={"request_id": request_id}
+        )
+        raise HTTPException(
+            status_code=500, detail="Failed to fetch restaurant")
+
+
 @router.put(
     "/restaurants/{restaurant_id}",
     response_model=RestaurantResponse,
@@ -198,3 +253,85 @@ def update_restaurant(
         raise HTTPException(
             status_code=500, detail="Failed to update restaurant")
 
+
+@router.get(
+    "/restaurants/{restaurant_id}/stats",
+    response_model=RestaurantStatsResponse,
+    summary="Get Restaurant Statistics",
+    description="Get dashboard statistics for a restaurant.",
+    responses={
+        200: {"description": "Statistics retrieved successfully"},
+        401: {"description": "Invalid authentication"},
+        404: {"description": "Restaurant not found"},
+        500: {"description": "Failed to fetch statistics"}
+    }
+)
+def get_restaurant_stats(
+    request: Request,
+    restaurant_id: str = Path(..., description="Restaurant UUID"),
+    x_vapi_secret: Optional[str] = Header(
+        None, alias="X-Vapi-Secret", description="Vapi webhook secret for authentication")
+):
+    """Get dashboard statistics for a restaurant. Accepts JWT or X-Vapi-Secret."""
+    require_restaurant_access(request, restaurant_id, x_vapi_secret)
+
+    try:
+        stats = get_restaurant_stats_service(restaurant_id)
+        return RestaurantStatsResponse(**stats)
+    except HTTPException:
+        raise
+    except Exception as e:
+        request_id = get_request_id(request)
+        logger.error(
+            f"Error fetching stats for restaurant {restaurant_id}: {e}",
+            exc_info=True,
+            extra={"request_id": request_id}
+        )
+        raise HTTPException(
+            status_code=500, detail="Failed to fetch statistics")
+
+
+@router.delete(
+    "/restaurants/{restaurant_id}",
+    response_model=DeleteRestaurantResponse,
+    summary="Delete Restaurant",
+    description="Delete a restaurant and all associated data (cascade delete).",
+    responses={
+        200: {"description": "Restaurant deleted successfully"},
+        401: {"description": "Invalid authentication"},
+        403: {"description": "Access denied"},
+        404: {"description": "Restaurant not found"},
+        500: {"description": "Failed to delete restaurant"}
+    }
+)
+def delete_restaurant(
+    request: Request,
+    restaurant_id: str = Path(..., description="Restaurant UUID"),
+    x_vapi_secret: Optional[str] = Header(
+        None, alias="X-Vapi-Secret", description="Vapi webhook secret for authentication")
+):
+    """Delete a restaurant and all associated data. Accepts JWT only (user must own restaurant)."""
+    # Only allow JWT authentication (not X-Vapi-Secret) for security
+    require_restaurant_access(request, restaurant_id, None)
+
+    try:
+        deleted = delete_restaurant_service(restaurant_id)
+        if not deleted:
+            raise HTTPException(
+                status_code=404, detail="Restaurant not found")
+
+        return DeleteRestaurantResponse(
+            success=True,
+            message="Restaurant and all associated data deleted successfully"
+        )
+    except HTTPException:
+        raise
+    except Exception as e:
+        request_id = get_request_id(request)
+        logger.error(
+            f"Error deleting restaurant {restaurant_id}: {e}",
+            exc_info=True,
+            extra={"request_id": request_id}
+        )
+        raise HTTPException(
+            status_code=500, detail="Failed to delete restaurant")

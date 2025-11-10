@@ -1,0 +1,192 @@
+@import "tailwindcss";
+
+@theme {
+  --color-primary: #FF6B35;
+  --color-secondary: #004E89;
+  --color-success: #28A745;
+  --color-warning: #FFC107;
+  --color-error: #DC3545;
+  --color-background: #F8F9FA;
+  --color-surface: #FFFFFF;
+  --color-text: #212529;
+  
+  --breakpoint-mobile: 320px;
+  --breakpoint-tablet: 768px;
+  --breakpoint-desktop: 1024px;
+}
+
+@layer base {
+  :root {
+    font-family: system-ui, Avenir, Helvetica, Arial, sans-serif;
+    line-height: 1.5;
+    font-weight: 400;
+  }
+
+  body {
+    margin: 0;
+    min-width: 320px;
+    min-height: 100vh;
+    background-color: var(--color-background);
+    color: var(--color-text);
+  }
+
+  /* Light scrollbar styling */
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: rgb(209 213 219) rgb(249 250 251);
+  }
+
+  *::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+  }
+
+  *::-webkit-scrollbar-track {
+    background: rgb(249 250 251);
+    border-radius: 4px;
+  }
+
+  *::-webkit-scrollbar-thumb {
+    background: rgb(209 213 219);
+    border-radius: 4px;
+    transition: background 0.2s ease;
+  }
+
+  *::-webkit-scrollbar-thumb:hover {
+    background: rgb(156 163 175);
+  }
+
+  /* Light checkbox styling */
+  input[type="checkbox"] {
+    accent-color: var(--color-primary);
+    cursor: pointer;
+  }
+}
+
+@layer utilities {
+  /* Dot pattern background */
+  .bg-dot-pattern {
+    background-image: radial-gradient(circle at 1px 1px, rgb(0 0 0 / 0.05) 1px, transparent 0);
+    background-size: 24px 24px;
+  }
+
+  /* Subtle grid pattern */
+  .bg-grid-pattern {
+    background-image: 
+      linear-gradient(to right, rgb(0 0 0 / 0.03) 1px, transparent 1px),
+      linear-gradient(to bottom, rgb(0 0 0 / 0.03) 1px, transparent 1px);
+    background-size: 32px 32px;
+  }
+  
+  /* Enhanced shadows with color */
+  .shadow-primary {
+    box-shadow: 0 10px 25px -5px rgb(255 107 53 / 0.2), 0 8px 10px -6px rgb(255 107 53 / 0.2);
+  }
+  
+  .shadow-secondary {
+    box-shadow: 0 10px 25px -5px rgb(0 78 137 / 0.2), 0 8px 10px -6px rgb(0 78 137 / 0.2);
+  }
+
+  /* Scroll reveal animations */
+  .reveal-fade {
+    opacity: 0;
+    transition: opacity 0.8s ease-out, transform 0.8s ease-out;
+  }
+
+  .reveal-fade.is-visible {
+    opacity: 1;
+  }
+
+  .reveal-slide-up {
+    opacity: 0;
+    transform: translateY(40px);
+    transition: opacity 0.8s ease-out, transform 0.8s ease-out;
+  }
+
+  .reveal-slide-up.is-visible {
+    opacity: 1;
+    transform: translateY(0);
+  }
+
+  .reveal-slide-left {
+    opacity: 0;
+    transform: translateX(40px);
+    transition: opacity 0.8s ease-out, transform 0.8s ease-out;
+  }
+
+  .reveal-slide-left.is-visible {
+    opacity: 1;
+    transform: translateX(0);
+  }
+
+  .reveal-slide-right {
+    opacity: 0;
+    transform: translateX(-40px);
+    transition: opacity 0.8s ease-out, transform 0.8s ease-out;
+  }
+
+  .reveal-slide-right.is-visible {
+    opacity: 1;
+    transform: translateX(0);
+  }
+
+  /* Stagger delay classes */
+  .delay-100 {
+    transition-delay: 100ms;
+  }
+
+  .delay-200 {
+    transition-delay: 200ms;
+  }
+
+  .delay-300 {
+    transition-delay: 300ms;
+  }
+
+  .delay-400 {
+    transition-delay: 400ms;
+  }
+
+  /* Blob animations */
+  @keyframes float {
+    0%, 100% {
+      transform: translate(0, 0) rotate(0deg);
+    }
+    33% {
+      transform: translate(20px, -20px) rotate(5deg);
+    }
+    66% {
+      transform: translate(-10px, 10px) rotate(-5deg);
+    }
+  }
+
+  @keyframes float-slow {
+    0%, 100% {
+      transform: translate(0, 0) rotate(0deg);
+    }
+    50% {
+      transform: translate(30px, 30px) rotate(10deg);
+    }
+  }
+
+  @keyframes float-slow-reverse {
+    0%, 100% {
+      transform: translate(0, 0) rotate(0deg);
+    }
+    50% {
+      transform: translate(-30px, -30px) rotate(-10deg);
+    }
+  }
+
+  .animate-float {
+    animation: float 20s ease-in-out infinite;
+  }
+
+  .animate-float-slow {
+    animation: float-slow 25s ease-in-out infinite;
+  }
+
+  .animate-float-slow-reverse {
+    animation: float-slow-reverse 22s ease-in-out infinite;
+  }
+}
