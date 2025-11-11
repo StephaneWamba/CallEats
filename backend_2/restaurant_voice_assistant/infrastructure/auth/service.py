@@ -71,9 +71,14 @@ def get_restaurant_id(request: Request) -> str:
     Raises:
         HTTPException: If user is not authenticated (401) or has no restaurant association (403)
     """
+    import logging
+    logger = logging.getLogger(__name__)
+    
     user = get_current_user(request)
     restaurant_id = user.get("restaurant_id")
+    logger.info(f"get_restaurant_id: user={user.get('user_id')}, restaurant_id={restaurant_id}")
     if not restaurant_id:
+        logger.warning(f"get_restaurant_id: User {user.get('user_id')} has no restaurant_id")
         raise HTTPException(
             status_code=403,
             detail="User is not associated with a restaurant"

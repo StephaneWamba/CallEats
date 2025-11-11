@@ -32,6 +32,9 @@ from restaurant_voice_assistant.infrastructure.database.client import (
     get_supabase_client,
     get_supabase_service_client
 )
+import logging
+
+logger = logging.getLogger(__name__)
 
 
 class AuthMiddleware(BaseHTTPMiddleware):
@@ -82,17 +85,22 @@ class AuthMiddleware(BaseHTTPMiddleware):
 
                     if user_resp.data:
                         user_data = user_resp.data[0]
+                        restaurant_id = user_data["restaurant_id"]
+                        logger.info(f"AuthMiddleware: Found user {user_id}, restaurant_id: {restaurant_id}")
                         request.state.user = {
                             "user_id": user_id,
                             "email": email or user_data.get("email"),
-                            "restaurant_id": user_data["restaurant_id"],
+                            "restaurant_id": restaurant_id,
                             "role": user_data.get("role", "user")
                         }
                     else:
+                        logger.warning(f"AuthMiddleware: User {user_id} not found in users table")
                         request.state.user = None
                 else:
+                    logger.warning("AuthMiddleware: Invalid user_response or user")
                     request.state.user = None
-            except Exception:
+            except Exception as e:
+                logger.error(f"AuthMiddleware: Exception during user lookup: {e}", exc_info=True)
                 request.state.user = None
         else:
             request.state.user = None
