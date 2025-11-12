@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { MapContainer, TileLayer, GeoJSON, useMap } from 'react-leaflet';
+import { MapClickHandler } from './MapClickHandler';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 // @ts-ignore - leaflet-draw doesn't have types
@@ -26,7 +27,7 @@ const DefaultIcon = L.icon({
 
 L.Marker.prototype.options.icon = DefaultIcon;
 
-interface DeliveryZoneMapProps {
+export interface DeliveryZoneMapProps {
   zones: DeliveryZoneResponse[];
   selectedZone?: DeliveryZoneResponse | null;
   onZoneSelect?: (zone: DeliveryZoneResponse | null) => void;
@@ -41,7 +42,7 @@ const DrawingHandler: React.FC<{
   selectedZone: DeliveryZoneResponse | null;
   onBoundaryChange: (zoneId: string, boundary: any) => void;
   restaurantId: string;
-}> = ({ selectedZone, onBoundaryChange, restaurantId }) => {
+}> = ({ selectedZone, onBoundaryChange }) => {
   const map = useMap();
   const drawControlRef = useRef<L.Control.Draw | null>(null);
   const drawnLayerRef = useRef<L.FeatureGroup | null>(null);
@@ -80,8 +81,8 @@ const DrawingHandler: React.FC<{
         });
         drawnLayers.addLayer(geoJsonLayer);
         map.fitBounds(geoJsonLayer.getBounds());
-      } catch (error) {
-        console.error('Error loading boundary:', error);
+      } catch (_error) {
+        // Error loading boundary, ignore
       }
     }
 
@@ -199,8 +200,8 @@ export const DeliveryZoneMap: React.FC<DeliveryZoneMapProps> = ({
           mapRef.current.setView([result.lat, result.lng], 15);
         }
       }
-    } catch (error) {
-      console.error('Search error:', error);
+    } catch (_error) {
+      // Search error, ignore
     } finally {
       setIsSearching(false);
     }
@@ -212,10 +213,9 @@ export const DeliveryZoneMap: React.FC<DeliveryZoneMapProps> = ({
       const result = await reverseGeocode(lat, lng);
       if (result) {
         // You could show a popup or update UI with the address
-        console.log('Clicked location:', result.display_name);
       }
-    } catch (error) {
-      console.error('Reverse geocode error:', error);
+    } catch (_error) {
+      // Reverse geocode error, ignore
     }
   };
 
@@ -253,15 +253,12 @@ export const DeliveryZoneMap: React.FC<DeliveryZoneMapProps> = ({
           center={mapCenter}
           zoom={mapZoom}
           style={{ height: '100%', width: '100%' }}
-          whenCreated={(map) => {
-            mapRef.current = map;
-            map.on('click', handleMapClick);
-          }}
         >
           <TileLayer
             attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
             url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
           />
+          <MapClickHandler onMapClick={handleMapClick} />
 
           {/* Draw existing zone boundaries */}
           {zones.map((zone, index) => {
@@ -300,7 +297,7 @@ export const DeliveryZoneMap: React.FC<DeliveryZoneMapProps> = ({
 
         {/* Zone Legend */}
         {zones.length > 0 && (
-          <div className="absolute top-4 right-4 bg-white rounded-lg shadow-lg p-4 z-[1000] max-w-xs">
+          <div className="absolute top-4 right-4 bg-white rounded-lg shadow-lg p-4 z-[400] max-w-xs">
             <h3 className="text-sm font-semibold text-gray-900 mb-2">Delivery Zones</h3>
             <div className="space-y-1">
               {zones.map((zone, index) => (

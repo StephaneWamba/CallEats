@@ -255,6 +255,18 @@ export const DeliveryZones: React.FC = () => {
           onFormDataChange={setFormData}
           isSubmitting={createZoneMutation.isPending || updateZoneMutation.isPending}
         />
+        
+        {/* Hide map controls when modal is open */}
+        {isFormOpen && (
+          <style>{`
+            .leaflet-control-container,
+            .leaflet-draw,
+            .leaflet-top,
+            .leaflet-bottom {
+              z-index: 100 !important;
+            }
+          `}</style>
+        )}
 
         {/* Delete Confirmation Modal */}
         <DeleteZoneModal
