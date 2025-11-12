@@ -16,6 +16,14 @@ export const MenuItemCard: React.FC<MenuItemCardProps> = ({
   onDelete,
 }) => {
   const category = categories.find((c) => c.id === item.category_id);
+  
+  // Safely format price - handle number, string, null, or undefined
+  const formatPrice = (price: unknown): string => {
+    if (price === null || price === undefined) return '0.00';
+    if (typeof price === 'number') return price.toFixed(2);
+    const parsed = parseFloat(String(price));
+    return isNaN(parsed) ? '0.00' : parsed.toFixed(2);
+  };
 
   return (
     <div className="group relative overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-md transition-all duration-300 hover:shadow-lg">
@@ -59,7 +67,7 @@ export const MenuItemCard: React.FC<MenuItemCardProps> = ({
             )}
           </div>
           <div className="text-lg font-bold text-primary">
-            ${item.price.toFixed(2)}
+            ${formatPrice(item.price)}
           </div>
         </div>
 

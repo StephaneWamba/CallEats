@@ -72,7 +72,9 @@ export const ModifierList: React.FC<ModifierListProps> = ({
                 <div>
                   <div className="font-medium">{modifier.name}</div>
                   <div className="flex items-center gap-2 text-xs text-gray-500">
-                    <span>+${modifier.price.toFixed(2)}</span>
+                    <span>
+                      +${typeof modifier.price === 'number' ? modifier.price.toFixed(2) : parseFloat(modifier.price || '0').toFixed(2)}
+                    </span>
                     {modifier.description && (
                       <>
                         <span>•</span>

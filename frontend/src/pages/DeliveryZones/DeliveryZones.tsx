@@ -1,11 +1,14 @@
-import React, { useEffect, useState } from 'react';
-import { Plus, MapPin, Edit2, Trash2, DollarSign, Package } from 'lucide-react';
-import { useAppSelector } from '@/store/hooks';
+import React, { useEffect, useState, useRef } from 'react';
+import { Plus, MapPin, Edit2, Trash2, DollarSign, Package, Map } from 'lucide-react';
+import { useAppSelector, useAppDispatch } from '@/store/hooks';
+import { showToast } from '@/store/slices/uiSlice';
 import {
   listDeliveryZones,
   createDeliveryZone,
   updateDeliveryZone,
   deleteDeliveryZone,
+  setZoneBoundary,
+  getZoneBoundary,
 } from '@/api/deliveryZones';
 import { Layout } from '@/components/layout/Layout';
 import { Button } from '@/components/common/Button';
@@ -13,6 +16,7 @@ import { Input } from '@/components/common/Input';
 import { Modal } from '@/components/common/Modal';
 import { LoadingSpinner } from '@/components/common/LoadingSpinner';
 import { EmptyState } from '@/components/common/EmptyState';
+import { DeliveryZoneMap } from '@/components/delivery-zones/DeliveryZoneMap';
 import type {
   DeliveryZoneResponse,
   CreateDeliveryZoneRequest,
@@ -20,6 +24,7 @@ import type {
 } from '@/types/delivery-zones';
 
 export const DeliveryZones: React.FC = () => {
+  const dispatch = useAppDispatch();
   const { restaurant } = useAppSelector((state) => state.restaurant);
   const [zones, setZones] = useState<DeliveryZoneResponse[]>([]);
   const [isLoading, setIsLoading] = useState(false);
@@ -27,6 +32,11 @@ export const DeliveryZones: React.FC = () => {
   const [editingZone, setEditingZone] = useState<DeliveryZoneResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
+  const [zoneToDelete, setZoneToDelete] = useState<DeliveryZoneResponse | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [selectedZone, setSelectedZone] = useState<DeliveryZoneResponse | null>(null);
+  const [showMap, setShowMap] = useState(true);
+  const lastFetchedRestaurantId = useRef<string | null>(null);
 
   // Form state
   const [formData, setFormData] = useState<CreateDeliveryZoneRequest>({
@@ -38,16 +48,36 @@ export const DeliveryZones: React.FC = () => {
 
   // Fetch zones
   useEffect(() => {
-    const fetchZones = async () => {
-      if (!restaurant) return;
+    const restaurantId = restaurant?.id;
+    
+    // Only fetch if restaurant ID changed
+    if (!restaurantId || restaurantId === lastFetchedRestaurantId.current) {
+      return;
+    }
 
+    lastFetchedRestaurantId.current = restaurantId;
+
+    const fetchZones = async () => {
       setIsLoading(true);
       setError(null);
       try {
-        const data = await listDeliveryZones(restaurant.id);
-        setZones(data);
+        const data = await listDeliveryZones(restaurantId);
+        // Fetch boundaries for zones that don't have them loaded
+        const zonesWithBoundaries = await Promise.all(
+          data.map(async (zone) => {
+            if (!zone.boundary) {
+              try {
+                const boundary = await getZoneBoundary(restaurantId, zone.id);
+                return { ...zone, boundary: boundary?.geometry || null };
+              } catch {
+                return zone;
+              }
+            }
+            return zone;
+          })
+        );
+        setZones(zonesWithBoundaries);
       } catch (err) {
-        console.error('Failed to fetch delivery zones:', err);
         setError('Failed to load delivery zones');
       } finally {
         setIsLoading(false);
@@ -55,7 +85,8 @@ export const DeliveryZones: React.FC = () => {
     };
 
     fetchZones();
-  }, [restaurant]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [restaurant?.id]);
 
   const handleOpenForm = (zone?: DeliveryZoneResponse) => {
     if (zone) {
@@ -115,34 +146,77 @@ export const DeliveryZones: React.FC = () => {
       const updatedZones = await listDeliveryZones(restaurant.id);
       setZones(updatedZones);
       setSuccess(true);
-      setTimeout(() => setSuccess(false), 3000);
+      dispatch(showToast({ 
+        message: `Delivery zone ${editingZone ? 'updated' : 'created'} successfully!`, 
+        type: 'success' 
+      }));
       handleCloseForm();
     } catch (err: any) {
-      console.error('Failed to save delivery zone:', err);
-      setError(err?.response?.data?.detail || 'Failed to save delivery zone');
+      const errorMessage = err?.response?.data?.detail || 'Failed to save delivery zone';
+      setError(errorMessage);
+      dispatch(showToast({ message: errorMessage, type: 'error' }));
     } finally {
       setIsLoading(false);
     }
   };
 
-  const handleDelete = async (zoneId: string) => {
-    if (!restaurant) return;
-    if (!confirm('Are you sure you want to delete this delivery zone?')) return;
+  const handleDelete = (zone: DeliveryZoneResponse) => {
+    setZoneToDelete(zone);
+  };
 
-    setIsLoading(true);
+  const handleConfirmDelete = async () => {
+    if (!restaurant || !zoneToDelete) return;
+
+    setIsDeleting(true);
     setError(null);
 
     try {
-      await deleteDeliveryZone(restaurant.id, zoneId);
+      await deleteDeliveryZone(restaurant.id, zoneToDelete.id);
       const updatedZones = await listDeliveryZones(restaurant.id);
       setZones(updatedZones);
       setSuccess(true);
-      setTimeout(() => setSuccess(false), 3000);
+      dispatch(showToast({ 
+        message: `"${zoneToDelete.zone_name}" has been deleted`, 
+        type: 'success' 
+      }));
+      setZoneToDelete(null);
     } catch (err: any) {
-      console.error('Failed to delete delivery zone:', err);
-      setError(err?.response?.data?.detail || 'Failed to delete delivery zone');
+      const errorMessage = err?.response?.data?.detail || 'Failed to delete delivery zone';
+      setError(errorMessage);
+      dispatch(showToast({ message: errorMessage, type: 'error' }));
     } finally {
-      setIsLoading(false);
+      setIsDeleting(false);
+    }
+  };
+
+  const handleCancelDelete = () => {
+    setZoneToDelete(null);
+  };
+
+  const handleBoundaryChange = async (zoneId: string, boundary: any) => {
+    if (!restaurant) return;
+
+    try {
+      await setZoneBoundary(restaurant.id, zoneId, boundary);
+      // Refresh zones to get updated boundary
+      const updatedZones = await listDeliveryZones(restaurant.id);
+      setZones(updatedZones);
+      
+      // Update selected zone if it's the one being edited
+      if (selectedZone?.id === zoneId) {
+        const updatedZone = updatedZones.find((z) => z.id === zoneId);
+        if (updatedZone) {
+          setSelectedZone(updatedZone);
+        }
+      }
+
+      dispatch(showToast({ 
+        message: 'Zone boundary updated successfully!', 
+        type: 'success' 
+      }));
+    } catch (err: any) {
+      const errorMessage = err?.response?.data?.detail || 'Failed to update zone boundary';
+      dispatch(showToast({ message: errorMessage, type: 'error' }));
     }
   };
 
@@ -150,7 +224,11 @@ export const DeliveryZones: React.FC = () => {
     return (
       <Layout>
         <div className="flex min-h-[400px] items-center justify-center">
-          <LoadingSpinner size="lg" />
+          <EmptyState
+            icon={MapPin}
+            title="No restaurant found"
+            description="You are not associated with a restaurant. Please contact support or create a restaurant account."
+          />
         </div>
       </Layout>
     );
@@ -167,10 +245,20 @@ export const DeliveryZones: React.FC = () => {
               Manage delivery zones and their fees for your restaurant.
             </p>
           </div>
-          <Button onClick={() => handleOpenForm()} variant="primary" size="md">
-            <Plus className="mr-2 h-4 w-4" />
-            Add Zone
-          </Button>
+          <div className="flex gap-2">
+            <Button
+              onClick={() => setShowMap(!showMap)}
+              variant={showMap ? 'primary' : 'secondary'}
+              size="md"
+            >
+              <Map className="mr-2 h-4 w-4" />
+              {showMap ? 'Hide Map' : 'Show Map'}
+            </Button>
+            <Button onClick={() => handleOpenForm()} variant="primary" size="md">
+              <Plus className="mr-2 h-4 w-4" />
+              Add Zone
+            </Button>
+          </div>
         </div>
 
         {/* Success/Error Messages */}
@@ -181,6 +269,20 @@ export const DeliveryZones: React.FC = () => {
         )}
         {error && (
           <div className="rounded-lg bg-error/10 border border-error p-4 text-error">{error}</div>
+        )}
+
+        {/* Map Section */}
+        {showMap && restaurant && (
+          <div className="rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
+            <DeliveryZoneMap
+              zones={zones}
+              selectedZone={selectedZone}
+              onZoneSelect={setSelectedZone}
+              onBoundaryChange={handleBoundaryChange}
+              restaurantId={restaurant.id}
+              center={restaurant.address ? undefined : [40.7128, -74.006]} // Default to NYC if no address
+            />
+          </div>
         )}
 
         {/* Zones List */}
@@ -205,7 +307,11 @@ export const DeliveryZones: React.FC = () => {
             {zones.map((zone) => (
               <div
                 key={zone.id}
-                className="rounded-xl border border-gray-200 bg-white p-6 shadow-sm transition-shadow hover:shadow-md"
+                className={`rounded-xl border-2 bg-white p-6 shadow-sm transition-shadow hover:shadow-md ${
+                  selectedZone?.id === zone.id
+                    ? 'border-primary bg-primary/5'
+                    : 'border-gray-200'
+                }`}
               >
                 <div className="mb-4 flex items-start justify-between">
                   <div className="flex-1">
@@ -216,6 +322,21 @@ export const DeliveryZones: React.FC = () => {
                   </div>
                   <div className="flex gap-2">
                     <button
+                      onClick={() => {
+                        setSelectedZone(zone);
+                        setShowMap(true);
+                      }}
+                      className={`rounded-lg p-2 transition-colors ${
+                        selectedZone?.id === zone.id
+                          ? 'bg-primary/10 text-primary'
+                          : 'text-gray-600 hover:bg-gray-100 hover:text-primary'
+                      }`}
+                      aria-label="Select zone on map"
+                      title="View on map"
+                    >
+                      <MapPin className="h-4 w-4" />
+                    </button>
+                    <button
                       onClick={() => handleOpenForm(zone)}
                       className="rounded-lg p-2 text-gray-600 transition-colors hover:bg-gray-100 hover:text-primary"
                       aria-label="Edit zone"
@@ -223,7 +344,7 @@ export const DeliveryZones: React.FC = () => {
                       <Edit2 className="h-4 w-4" />
                     </button>
                     <button
-                      onClick={() => handleDelete(zone.id)}
+                      onClick={() => handleDelete(zone)}
                       className="rounded-lg p-2 text-gray-600 transition-colors hover:bg-gray-100 hover:text-error"
                       aria-label="Delete zone"
                     >
@@ -327,6 +448,47 @@ export const DeliveryZones: React.FC = () => {
             </div>
           </form>
         </Modal>
+
+        {/* Delete Confirmation Modal */}
+        {zoneToDelete && (
+          <>
+            <div
+              className="fixed inset-0 z-[60] bg-gray-900/50 backdrop-blur-sm"
+              onClick={handleCancelDelete}
+            />
+            <div className="fixed inset-0 z-[60] flex items-center justify-center p-4">
+              <div
+                className="w-full max-w-sm rounded-2xl border border-gray-200 bg-white p-6 shadow-xl"
+                onClick={(e) => e.stopPropagation()}
+              >
+                <h3 className="mb-2 text-lg font-bold text-gray-900">Delete Delivery Zone?</h3>
+                <p className="mb-6 text-sm text-gray-600">
+                  This will permanently remove "{zoneToDelete.zone_name}" from your delivery zones. This action cannot be undone.
+                </p>
+                <div className="flex gap-3">
+                  <Button
+                    variant="outline"
+                    size="md"
+                    onClick={handleCancelDelete}
+                    disabled={isDeleting}
+                    className="flex-1"
+                  >
+                    Cancel
+                  </Button>
+                  <Button
+                    variant="danger"
+                    size="md"
+                    onClick={handleConfirmDelete}
+                    isLoading={isDeleting}
+                    className="flex-1"
+                  >
+                    Delete
+                  </Button>
+                </div>
+              </div>
+            </div>
+          </>
+        )}
       </div>
     </Layout>
   );

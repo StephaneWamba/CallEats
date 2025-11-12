@@ -108,14 +108,12 @@ export const checkPointInZones = async (
   restaurantId: string,
   latitude: number,
   longitude: number
-): Promise<{ in_zone: boolean; zone_id?: string; zone_name?: string }> => {
-  const response = await apiClient.post<{
+): Promise<{ in_zone: boolean; zone?: any }> => {
+  const response = await apiClient.get<{
     in_zone: boolean;
-    zone_id?: string;
-    zone_name?: string;
+    zone?: any;
   }>(
-    API_ENDPOINTS.DELIVERY_ZONES.CHECK_POINT(restaurantId),
-    { latitude, longitude }
+    `${API_ENDPOINTS.DELIVERY_ZONES.CHECK_POINT(restaurantId)}?lat=${latitude}&lng=${longitude}`
   );
   return response.data;
 };

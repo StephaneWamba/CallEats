@@ -1,13 +1,15 @@
-import React, { useEffect, useState } from 'react';
-import { Settings as SettingsIcon, Building2, Key, Phone, Lock, Save } from 'lucide-react';
+import React, { useEffect, useState, useRef } from 'react';
+import { Settings as SettingsIcon, Building2, Phone, Lock, Save } from 'lucide-react';
 import { useAppSelector, useAppDispatch } from '@/store/hooks';
 import { setRestaurant } from '@/store/slices/restaurantSlice';
+import { showToast } from '@/store/slices/uiSlice';
 import { getMyRestaurant, updateRestaurant } from '@/api/restaurants';
 import { changePassword } from '@/api/auth';
 import { Layout } from '@/components/layout/Layout';
 import { Button } from '@/components/common/Button';
 import { Input } from '@/components/common/Input';
 import { LoadingSpinner } from '@/components/common/LoadingSpinner';
+import { EmptyState } from '@/components/common/EmptyState';
 import type { UpdateRestaurantRequest } from '@/types/restaurant';
 import type { ChangePasswordRequest } from '@/types/auth';
 
@@ -22,6 +24,7 @@ export const Settings: React.FC = () => {
 
   // Restaurant form state
   const [restaurantName, setRestaurantName] = useState('');
+  const lastSyncedRestaurantId = useRef<string | null>(null);
 
   // Password form state
   const [passwordData, setPasswordData] = useState({
@@ -30,28 +33,35 @@ export const Settings: React.FC = () => {
     confirm_password: '',
   });
 
-  // Fetch restaurant data
+  // Fetch restaurant data and sync name
   useEffect(() => {
+    const restaurantId = restaurant?.id;
+    
     const fetchRestaurant = async () => {
-      if (!restaurant) {
-        setIsLoading(true);
-        try {
-          const data = await getMyRestaurant();
-          dispatch(setRestaurant(data));
-          setRestaurantName(data.name);
-        } catch (err) {
-          console.error('Failed to fetch restaurant:', err);
-          setError('Failed to load restaurant settings');
-        } finally {
-          setIsLoading(false);
+      if (!restaurantId) {
+        if (lastSyncedRestaurantId.current === null) {
+          setIsLoading(true);
+          try {
+            const data = await getMyRestaurant();
+            dispatch(setRestaurant(data));
+            setRestaurantName(data.name);
+            lastSyncedRestaurantId.current = data.id;
+          } catch (err) {
+            setError('Failed to load restaurant settings');
+          } finally {
+            setIsLoading(false);
+          }
         }
-      } else {
+      } else if (restaurantId !== lastSyncedRestaurantId.current && restaurant) {
+        // Restaurant changed (e.g., from another component), sync the name
         setRestaurantName(restaurant.name);
+        lastSyncedRestaurantId.current = restaurantId;
       }
     };
 
     fetchRestaurant();
-  }, [restaurant, dispatch]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [restaurant?.id]);
 
   const handleUpdateRestaurant = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -67,11 +77,14 @@ export const Settings: React.FC = () => {
       };
       const updated = await updateRestaurant(restaurant.id, updateData);
       dispatch(setRestaurant(updated));
-      setSuccess('Restaurant name updated successfully!');
+      const successMessage = 'Restaurant name updated successfully!';
+      setSuccess(successMessage);
+      dispatch(showToast({ message: successMessage, type: 'success' }));
       setTimeout(() => setSuccess(null), 3000);
     } catch (err: any) {
-      console.error('Failed to update restaurant:', err);
-      setError(err?.response?.data?.detail || 'Failed to update restaurant name');
+      const errorMessage = err?.response?.data?.detail || 'Failed to update restaurant name';
+      setError(errorMessage);
+      dispatch(showToast({ message: errorMessage, type: 'error' }));
     } finally {
       setIsSavingRestaurant(false);
     }
@@ -100,7 +113,9 @@ export const Settings: React.FC = () => {
         new_password: passwordData.new_password,
       };
       await changePassword(changePasswordData);
-      setSuccess('Password changed successfully!');
+      const successMessage = 'Password changed successfully!';
+      setSuccess(successMessage);
+      dispatch(showToast({ message: successMessage, type: 'success' }));
       setPasswordData({
         current_password: '',
         new_password: '',
@@ -108,18 +123,35 @@ export const Settings: React.FC = () => {
       });
       setTimeout(() => setSuccess(null), 3000);
     } catch (err: any) {
-      console.error('Failed to change password:', err);
-      setError(err?.response?.data?.detail || 'Failed to change password');
+      const errorMessage = err?.response?.data?.detail || 'Failed to change password';
+      setError(errorMessage);
+      dispatch(showToast({ message: errorMessage, type: 'error' }));
     } finally {
       setIsChangingPassword(false);
     }
   };
 
-  if (isLoading || !restaurant) {
+  if (isLoading) {
     return (
       <Layout>
         <div className="flex min-h-[400px] items-center justify-center">
           <LoadingSpinner size="lg" />
+        </div>
+      </Layout>
+    );
+  }
+
+  if (!restaurant) {
+    return (
+      <Layout>
+        <div className="flex min-h-[400px] items-center justify-center">
+          <div className="text-center">
+            <EmptyState
+              icon={SettingsIcon}
+              title="No restaurant found"
+              description="You are not associated with a restaurant. Please contact support or create a restaurant account."
+            />
+          </div>
         </div>
       </Layout>
     );
@@ -183,19 +215,6 @@ export const Settings: React.FC = () => {
               </div>
 
               <div>
-                <label className="mb-1 block text-xs font-medium text-gray-500">API Key</label>
-                <div className="flex items-center gap-2">
-                  <Key className="h-4 w-4 text-gray-400" />
-                  <p className="truncate text-sm font-mono text-gray-900">{restaurant.api_key}</p>
-                </div>
-              </div>
-
-              <div>
-                <label className="mb-1 block text-xs font-medium text-gray-500">Restaurant ID</label>
-                <p className="truncate text-sm font-mono text-gray-900">{restaurant.id}</p>
-              </div>
-
-              <div>
                 <label className="mb-1 block text-xs font-medium text-gray-500">Created At</label>
                 <p className="text-sm text-gray-900">
                   {new Date(restaurant.created_at).toLocaleDateString()}
@@ -216,6 +235,7 @@ export const Settings: React.FC = () => {
             <Input
               label="Current Password"
               type="password"
+              name="current-password"
               value={passwordData.current_password}
               onChange={(e) =>
                 setPasswordData({ ...passwordData, current_password: e.target.value })
@@ -227,6 +247,7 @@ export const Settings: React.FC = () => {
             <Input
               label="New Password"
               type="password"
+              name="new-password"
               value={passwordData.new_password}
               onChange={(e) =>
                 setPasswordData({ ...passwordData, new_password: e.target.value })
@@ -239,6 +260,7 @@ export const Settings: React.FC = () => {
             <Input
               label="Confirm New Password"
               type="password"
+              name="confirm-password"
               value={passwordData.confirm_password}
               onChange={(e) =>
                 setPasswordData({ ...passwordData, confirm_password: e.target.value })

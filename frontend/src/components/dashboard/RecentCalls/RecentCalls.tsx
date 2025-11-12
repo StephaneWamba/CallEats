@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import { Link } from 'react-router-dom';
 import { Phone, ArrowRight, Clock } from 'lucide-react';
 import { ROUTES } from '../../../config/routes';
@@ -28,24 +28,33 @@ export const RecentCalls: React.FC = () => {
   const { restaurant } = useAppSelector((state) => state.restaurant);
   const [calls, setCalls] = useState<CallResponse[]>([]);
   const [isLoading, setIsLoading] = useState(false);
+  const lastFetchedRestaurantId = useRef<string | null>(null);
 
   useEffect(() => {
-    const fetchCalls = async () => {
-      if (!restaurant) return;
+    const restaurantId = restaurant?.id;
+    
+    // Only fetch if restaurant ID changed
+    if (!restaurantId || restaurantId === lastFetchedRestaurantId.current) {
+      return;
+    }
 
+    lastFetchedRestaurantId.current = restaurantId;
+
+    const fetchCalls = async () => {
       setIsLoading(true);
       try {
-        const data = await listCalls(restaurant.id, 5); // Get last 5 calls
+        const data = await listCalls(restaurantId, 5); // Get last 5 calls
         setCalls(data);
       } catch (err) {
-        console.error('Failed to fetch recent calls:', err);
+        // Error handled silently
       } finally {
         setIsLoading(false);
       }
     };
 
     fetchCalls();
-  }, [restaurant]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [restaurant?.id]);
 
   return (
     <div className="rounded-xl border border-gray-200 bg-white p-6 shadow-sm">

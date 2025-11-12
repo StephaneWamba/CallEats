@@ -7,6 +7,7 @@ interface ImageUploadProps {
   onImageDelete?: () => void;
   disabled?: boolean;
   error?: string;
+  onError?: (message: string) => void;
 }
 
 export const ImageUpload: React.FC<ImageUploadProps> = ({
@@ -15,6 +16,7 @@ export const ImageUpload: React.FC<ImageUploadProps> = ({
   onImageDelete,
   disabled = false,
   error,
+  onError,
 }) => {
   const [previewUrl, setPreviewUrl] = useState<string | null>(currentImageUrl || null);
   const [isDragging, setIsDragging] = useState(false);
@@ -29,13 +31,23 @@ export const ImageUpload: React.FC<ImageUploadProps> = ({
 
     // Validate file type
     if (!file.type.startsWith('image/')) {
-      alert('Please select an image file (jpg, png, webp)');
+      const errorMsg = 'Please select an image file (jpg, png, webp)';
+      if (onError) {
+        onError(errorMsg);
+      } else {
+        alert(errorMsg);
+      }
       return;
     }
 
     // Validate file size (5MB max)
     if (file.size > 5 * 1024 * 1024) {
-      alert('Image size must be less than 5MB');
+      const errorMsg = 'Image size must be less than 5MB';
+      if (onError) {
+        onError(errorMsg);
+      } else {
+        alert(errorMsg);
+      }
       return;
     }
 

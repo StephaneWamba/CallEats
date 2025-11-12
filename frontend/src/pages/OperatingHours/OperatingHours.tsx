@@ -1,6 +1,7 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import { Clock, Save } from 'lucide-react';
-import { useAppSelector } from '@/store/hooks';
+import { useAppSelector, useAppDispatch } from '@/store/hooks';
+import { showToast } from '@/store/slices/uiSlice';
 import { listOperatingHours, bulkUpdateOperatingHours } from '@/api/operatingHours';
 import { Layout } from '@/components/layout/Layout';
 import { Button } from '@/components/common/Button';
@@ -19,12 +20,14 @@ const DAYS_OF_WEEK = [
 ] as const;
 
 export const OperatingHours: React.FC = () => {
+  const dispatch = useAppDispatch();
   const { restaurant } = useAppSelector((state) => state.restaurant);
   const [hours, setHours] = useState<OperatingHourResponse[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
+  const lastFetchedRestaurantId = useRef<string | null>(null);
 
   // Initialize form data with default hours
   const [formData, setFormData] = useState<Record<string, OperatingHourRequest>>(() => {
@@ -42,13 +45,20 @@ export const OperatingHours: React.FC = () => {
 
   // Fetch existing hours
   useEffect(() => {
-    const fetchHours = async () => {
-      if (!restaurant) return;
+    const restaurantId = restaurant?.id;
+    
+    // Only fetch if restaurant ID changed
+    if (!restaurantId || restaurantId === lastFetchedRestaurantId.current) {
+      return;
+    }
 
+    lastFetchedRestaurantId.current = restaurantId;
+
+    const fetchHours = async () => {
       setIsLoading(true);
       setError(null);
       try {
-        const data = await listOperatingHours(restaurant.id);
+        const data = await listOperatingHours(restaurantId);
         setHours(data);
 
         // Populate form with existing hours
@@ -64,16 +74,20 @@ export const OperatingHours: React.FC = () => {
           });
           setFormData((prev) => ({ ...prev, ...hoursMap }));
         }
-      } catch (err) {
-        console.error('Failed to fetch operating hours:', err);
-        setError('Failed to load operating hours');
+      } catch (err: any) {
+        // Handle 403 - user not associated with restaurant
+        if (err?.response?.status === 403) {
+          setError('You are not associated with a restaurant. Please contact support.');
+        } else {
+          setError('Failed to load operating hours');
+        }
       } finally {
         setIsLoading(false);
       }
     };
 
     fetchHours();
-  }, [restaurant]);
+  }, [restaurant?.id]);
 
   const handleDayChange = (day: string, field: keyof OperatingHourRequest, value: string | boolean) => {
     setFormData((prev) => ({
@@ -100,12 +114,11 @@ export const OperatingHours: React.FC = () => {
       const updatedHours = await listOperatingHours(restaurant.id);
       setHours(updatedHours);
       setSuccess(true);
-
-      // Clear success message after 3 seconds
-      setTimeout(() => setSuccess(false), 3000);
+      dispatch(showToast({ message: 'Operating hours updated successfully!', type: 'success' }));
     } catch (err) {
-      console.error('Failed to update operating hours:', err);
-      setError('Failed to save operating hours. Please try again.');
+      const errorMessage = 'Failed to save operating hours. Please try again.';
+      setError(errorMessage);
+      dispatch(showToast({ message: errorMessage, type: 'error' }));
     } finally {
       setIsSaving(false);
     }
@@ -115,7 +128,13 @@ export const OperatingHours: React.FC = () => {
     return (
       <Layout>
         <div className="flex min-h-[400px] items-center justify-center">
-          <LoadingSpinner size="lg" />
+          <div className="text-center">
+            <EmptyState
+              icon={Clock}
+              title="No restaurant found"
+              description="You are not associated with a restaurant. Please contact support or create a restaurant account."
+            />
+          </div>
         </div>
       </Layout>
     );

@@ -1,6 +1,7 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import { Phone, Clock, DollarSign, CheckCircle2, XCircle, MessageSquare } from 'lucide-react';
-import { useAppSelector } from '@/store/hooks';
+import { useAppSelector, useAppDispatch } from '@/store/hooks';
+import { showToast } from '@/store/slices/uiSlice';
 import { listCalls, getCall } from '@/api/calls';
 import { Layout } from '@/components/layout/Layout';
 import { LoadingSpinner } from '@/components/common/LoadingSpinner';
@@ -53,33 +54,43 @@ const getOutcomeColor = (outcome: string): string => {
 };
 
 export const CallHistory: React.FC = () => {
+  const dispatch = useAppDispatch();
   const { restaurant } = useAppSelector((state) => state.restaurant);
   const [calls, setCalls] = useState<CallResponse[]>([]);
   const [selectedCall, setSelectedCall] = useState<CallResponse | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [isLoadingDetails, setIsLoadingDetails] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const lastFetchedRestaurantId = useRef<string | null>(null);
 
   // Fetch calls
   useEffect(() => {
-    const fetchCalls = async () => {
-      if (!restaurant) return;
+    const restaurantId = restaurant?.id;
+    
+    // Only fetch if restaurant ID changed
+    if (!restaurantId || restaurantId === lastFetchedRestaurantId.current) {
+      return;
+    }
 
+    lastFetchedRestaurantId.current = restaurantId;
+
+    const fetchCalls = async () => {
       setIsLoading(true);
       setError(null);
       try {
-        const data = await listCalls(restaurant.id, 100);
+        const data = await listCalls(restaurantId, 100);
         setCalls(data);
       } catch (err) {
-        console.error('Failed to fetch call history:', err);
-        setError('Failed to load call history');
+        const errorMessage = 'Failed to load call history';
+        setError(errorMessage);
+        dispatch(showToast({ message: errorMessage, type: 'error' }));
       } finally {
         setIsLoading(false);
       }
     };
 
     fetchCalls();
-  }, [restaurant]);
+  }, [restaurant?.id, dispatch]);
 
   const handleViewDetails = async (call: CallResponse) => {
     if (!restaurant) return;
@@ -89,8 +100,9 @@ export const CallHistory: React.FC = () => {
       const fullCall = await getCall(call.id, restaurant.id);
       setSelectedCall(fullCall);
     } catch (err) {
-      console.error('Failed to fetch call details:', err);
-      setError('Failed to load call details');
+      const errorMessage = 'Failed to load call details';
+      setError(errorMessage);
+      dispatch(showToast({ message: errorMessage, type: 'error' }));
     } finally {
       setIsLoadingDetails(false);
     }
@@ -100,7 +112,11 @@ export const CallHistory: React.FC = () => {
     return (
       <Layout>
         <div className="flex min-h-[400px] items-center justify-center">
-          <LoadingSpinner size="lg" />
+          <EmptyState
+            icon={Phone}
+            title="No restaurant found"
+            description="You are not associated with a restaurant. Please contact support or create a restaurant account."
+          />
         </div>
       </Layout>
     );
@@ -116,11 +132,6 @@ export const CallHistory: React.FC = () => {
             View and manage all customer calls to your restaurant.
           </p>
         </div>
-
-        {/* Error Message */}
-        {error && (
-          <div className="rounded-lg bg-error/10 border border-error p-4 text-error">{error}</div>
-        )}
 
         {/* Calls List */}
         {isLoading ? (

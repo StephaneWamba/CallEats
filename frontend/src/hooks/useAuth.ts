@@ -156,7 +156,6 @@ export const useAuth = () => {
       await logoutAPI();
     } catch (error) {
       // Ignore API errors - logout is primarily client-side
-      console.warn('Logout API call failed:', error);
     } finally {
       dispatch(logoutAction());
       navigate(ROUTES.LANDING);

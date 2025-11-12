@@ -11,6 +11,7 @@ import { OperatingHours } from '@/pages/OperatingHours';
 import { DeliveryZones } from '@/pages/DeliveryZones';
 import { CallHistory } from '@/pages/CallHistory';
 import { Settings } from '@/pages/Settings';
+import { Toast } from '@/components/common/Toast';
 
 // Pages
 const DashboardPage = () => <Dashboard />;
@@ -33,66 +34,69 @@ const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
 
 function App() {
   return (
-    <Routes>
-      {/* Public Routes */}
-      <Route path={ROUTES.LANDING} element={<LandingPage />} />
-      <Route path={ROUTES.LOGIN} element={<LoginPage />} />
-      <Route path={ROUTES.SIGNUP} element={<SignUpPage />} />
-      <Route path={ROUTES.PASSWORD_RESET} element={<PasswordResetPage />} />
+    <>
+      <Routes>
+        {/* Public Routes */}
+        <Route path={ROUTES.LANDING} element={<LandingPage />} />
+        <Route path={ROUTES.LOGIN} element={<LoginPage />} />
+        <Route path={ROUTES.SIGNUP} element={<SignUpPage />} />
+        <Route path={ROUTES.PASSWORD_RESET} element={<PasswordResetPage />} />
 
-      {/* Protected Routes */}
-      <Route
-        path={ROUTES.DASHBOARD}
-        element={
-          <ProtectedRoute>
-            <DashboardPage />
-          </ProtectedRoute>
-        }
-      />
-      <Route
-        path={ROUTES.MENU_BUILDER}
-        element={
-          <ProtectedRoute>
-            <MenuBuilderPage />
-          </ProtectedRoute>
-        }
-      />
-      <Route
-        path={ROUTES.OPERATING_HOURS}
-        element={
-          <ProtectedRoute>
-            <OperatingHoursPage />
-          </ProtectedRoute>
-        }
-      />
-      <Route
-        path={ROUTES.DELIVERY_ZONES}
-        element={
-          <ProtectedRoute>
-            <DeliveryZonesPage />
-          </ProtectedRoute>
-        }
-      />
-      <Route
-        path={ROUTES.CALL_HISTORY}
-        element={
-          <ProtectedRoute>
-            <CallHistoryPage />
-          </ProtectedRoute>
-        }
-      />
-      <Route
-        path={ROUTES.SETTINGS}
-        element={
-          <ProtectedRoute>
-            <SettingsPage />
-          </ProtectedRoute>
-        }
-      />
+        {/* Protected Routes */}
+        <Route
+          path={ROUTES.DASHBOARD}
+          element={
+            <ProtectedRoute>
+              <DashboardPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path={ROUTES.MENU_BUILDER}
+          element={
+            <ProtectedRoute>
+              <MenuBuilderPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path={ROUTES.OPERATING_HOURS}
+          element={
+            <ProtectedRoute>
+              <OperatingHoursPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path={ROUTES.DELIVERY_ZONES}
+          element={
+            <ProtectedRoute>
+              <DeliveryZonesPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path={ROUTES.CALL_HISTORY}
+          element={
+            <ProtectedRoute>
+              <CallHistoryPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path={ROUTES.SETTINGS}
+          element={
+            <ProtectedRoute>
+              <SettingsPage />
+            </ProtectedRoute>
+          }
+        />
 
-      {/* Catch all - redirect to landing */}
-      <Route path="*" element={<Navigate to={ROUTES.LANDING} replace />} />
-    </Routes>
+        {/* Catch all - redirect to landing */}
+        <Route path="*" element={<Navigate to={ROUTES.LANDING} replace />} />
+      </Routes>
+      <Toast />
+    </>
   );
 }
 

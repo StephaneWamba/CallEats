@@ -114,6 +114,7 @@ export const PasswordResetPage = () => {
             <Input
               label="Email Address"
               type="email"
+              name="email"
               placeholder="user@restaurant.com"
               error={errors.email?.message}
               {...register('email')}

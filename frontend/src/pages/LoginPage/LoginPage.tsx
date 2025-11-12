@@ -38,11 +38,43 @@ export const LoginPage = () => {
       await login(data);
       navigate(ROUTES.DASHBOARD);
     } catch (err: unknown) {
-      if (err instanceof Error) {
-        setError(err.message);
-      } else {
-        setError('Login failed. Please check your credentials.');
+      let errorMessage = 'Login failed. Please check your credentials.';
+      
+      if (err && typeof err === 'object' && 'response' in err) {
+        const axiosError = err as { 
+          response?: { 
+            data?: { 
+              detail?: string | string[]; 
+              message?: string;
+              error?: string;
+            };
+            status?: number;
+          };
+        };
+        
+        const responseData = axiosError.response?.data;
+        
+        if (responseData) {
+          // Handle FastAPI validation errors (detail can be string or array)
+          if (responseData.detail) {
+            if (Array.isArray(responseData.detail)) {
+              errorMessage = responseData.detail.map((d: any) => 
+                d.msg || d.message || String(d)
+              ).join(', ');
+            } else {
+              errorMessage = String(responseData.detail);
+            }
+          } else if (responseData.message) {
+            errorMessage = responseData.message;
+          } else if (responseData.error) {
+            errorMessage = responseData.error;
+          }
+        }
+      } else if (err instanceof Error) {
+        errorMessage = err.message;
       }
+      
+      setError(errorMessage);
     } finally {
       setIsLoading(false);
     }

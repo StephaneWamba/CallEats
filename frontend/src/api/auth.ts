@@ -111,7 +111,6 @@ export const logout = async (): Promise<void> => {
     await apiClient.post(API_ENDPOINTS.AUTH.LOGOUT);
   } catch (error) {
     // Ignore errors - logout is primarily client-side
-    console.warn('Logout API call failed:', error);
   }
 };
 

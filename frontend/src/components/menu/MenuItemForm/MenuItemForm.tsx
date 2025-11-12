@@ -3,7 +3,8 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { X, Trash2, Plus, Tag, Minus } from 'lucide-react';
-import { useAppSelector } from '@/store/hooks';
+import { useAppSelector, useAppDispatch } from '@/store/hooks';
+import { showToast } from '@/store/slices/uiSlice';
 import {
   createMenuItem,
   updateMenuItem,
@@ -12,6 +13,7 @@ import {
   deleteMenuItemImage,
   linkModifierToItem,
   unlinkModifierFromItem,
+  getMenuItem,
 } from '@/api/menuItems';
 import { Button } from '../../common/Button';
 import { Input } from '../../common/Input';
@@ -49,15 +51,15 @@ export const MenuItemForm: React.FC<MenuItemFormProps> = ({
   onClose,
   onSuccess,
 }) => {
+  const dispatch = useAppDispatch();
   const { restaurant } = useAppSelector((state) => state.restaurant);
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [selectedImage, setSelectedImage] = useState<File | null>(null);
   const [imageToDelete, setImageToDelete] = useState(false);
-  const [linkedModifierIds, setLinkedModifierIds] = useState<string[]>(
-    item?.modifiers?.map(m => m.id) || []
-  );
+  const [linkedModifierIds, setLinkedModifierIds] = useState<string[]>([]);
+  const [isLoadingModifiers, setIsLoadingModifiers] = useState(false);
 
   const {
     register,
@@ -74,6 +76,30 @@ export const MenuItemForm: React.FC<MenuItemFormProps> = ({
     },
   });
 
+  // Fetch full item with modifiers when form opens for editing
+  React.useEffect(() => {
+    const fetchItemModifiers = async () => {
+      if (!item || !restaurant) return;
+
+      setIsLoadingModifiers(true);
+      try {
+        const fullItem = await getMenuItem(restaurant.id, item.id);
+        // Extract modifier IDs from the modifiers array
+        const modifierIds = fullItem.modifiers?.map(m => m.id) || [];
+        setLinkedModifierIds(modifierIds);
+      } catch (err: any) {
+        // If fetching fails, try to use modifiers from the item prop
+        const modifierIds = item.modifiers?.map(m => m.id) || [];
+        setLinkedModifierIds(modifierIds);
+        console.warn('Failed to fetch item modifiers:', err);
+      } finally {
+        setIsLoadingModifiers(false);
+      }
+    };
+
+    fetchItemModifiers();
+  }, [item?.id, restaurant?.id]);
+
   const onSubmit = async (data: MenuItemFormData) => {
     if (!restaurant) {
       setError('Restaurant not found');
@@ -84,6 +110,15 @@ export const MenuItemForm: React.FC<MenuItemFormProps> = ({
     setIsLoading(true);
 
     try {
+      // Ensure price is a number
+      const price = typeof data.price === 'number' ? data.price : parseFloat(String(data.price || 0));
+      
+      if (isNaN(price) || price < 0) {
+        setError('Please enter a valid price');
+        setIsLoading(false);
+        return;
+      }
+
       let savedItem: MenuItemResponse;
 
       if (item) {
@@ -91,7 +126,7 @@ export const MenuItemForm: React.FC<MenuItemFormProps> = ({
         const updateData: UpdateMenuItemRequest = {
           name: data.name,
           description: data.description || null,
-          price: data.price,
+          price: price,
           category_id: data.category_id || null,
           available: data.available,
         };
@@ -101,16 +136,25 @@ export const MenuItemForm: React.FC<MenuItemFormProps> = ({
         const createData: CreateMenuItemRequest = {
           name: data.name,
           description: data.description || null,
-          price: data.price,
+          price: price,
           category_id: data.category_id || null,
           available: data.available ?? true,
         };
         savedItem = await createMenuItem(restaurant.id, createData);
       }
 
-      // Handle image upload
+      // Handle image upload (optional - don't fail if upload fails)
       if (selectedImage && savedItem) {
-        await uploadMenuItemImage(restaurant.id, savedItem.id, selectedImage);
+        try {
+          await uploadMenuItemImage(restaurant.id, savedItem.id, selectedImage);
+        } catch (imageError) {
+          // Log error but don't fail the entire operation
+          console.warn('Failed to upload image:', imageError);
+          dispatch(showToast({ 
+            message: 'Menu item saved, but image upload failed. You can upload the image later.', 
+            type: 'warning' 
+          }));
+        }
       }
 
       // Handle image deletion
@@ -171,6 +215,10 @@ export const MenuItemForm: React.FC<MenuItemFormProps> = ({
         // Unlink modifier
         await unlinkModifierFromItem(restaurant.id, item.id, modifierId);
         setLinkedModifierIds(prev => prev.filter(id => id !== modifierId));
+        dispatch(showToast({ 
+          message: 'Modifier removed successfully', 
+          type: 'success' 
+        }));
       } else {
         // Link modifier
         await linkModifierToItem(restaurant.id, item.id, {
@@ -179,13 +227,18 @@ export const MenuItemForm: React.FC<MenuItemFormProps> = ({
           display_order: linkedModifierIds.length,
         });
         setLinkedModifierIds(prev => [...prev, modifierId]);
+        dispatch(showToast({ 
+          message: 'Modifier added successfully', 
+          type: 'success' 
+        }));
       }
-    } catch (err: unknown) {
-      if (err instanceof Error) {
-        setError(err.message);
-      } else {
-        setError('Failed to update modifier link');
-      }
+    } catch (err: any) {
+      const errorMessage = err?.response?.data?.detail || err?.message || 'Failed to update modifier link';
+      setError(errorMessage);
+      dispatch(showToast({ 
+        message: errorMessage, 
+        type: 'error' 
+      }));
     }
   };
 
@@ -237,6 +290,7 @@ export const MenuItemForm: React.FC<MenuItemFormProps> = ({
                     onImageSelect={handleImageSelect}
                     onImageDelete={handleImageDelete}
                     disabled={isLoading}
+                    onError={(message) => dispatch(showToast({ message, type: 'error' }))}
                   />
                 </div>
 
@@ -340,8 +394,10 @@ export const MenuItemForm: React.FC<MenuItemFormProps> = ({
                                 <span className="flex items-center gap-2">
                                   <Tag className="h-4 w-4" />
                                   <span className="font-medium">{modifier.name}</span>
-                                  {modifier.price > 0 && (
-                                    <span className="text-xs">+${modifier.price.toFixed(2)}</span>
+                                  {(typeof modifier.price === 'number' ? modifier.price : parseFloat(modifier.price || '0')) > 0 && (
+                                    <span className="text-xs">
+                                      +${typeof modifier.price === 'number' ? modifier.price.toFixed(2) : parseFloat(modifier.price || '0').toFixed(2)}
+                                    </span>
                                   )}
                                 </span>
                                 {isLinked ? (

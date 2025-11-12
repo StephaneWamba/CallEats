@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import { Plus, Search } from 'lucide-react';
 import { useAppSelector, useAppDispatch } from '@/store/hooks';
 import {
@@ -7,9 +7,12 @@ import {
   setModifiers,
   setSelectedCategory,
 } from '@/store/slices/menuSlice';
+import { setRestaurant } from '@/store/slices/restaurantSlice';
+import { showToast } from '@/store/slices/uiSlice';
 import { listCategories } from '@/api/categories';
-import { listMenuItems } from '@/api/menuItems';
+import { listMenuItems, deleteMenuItem } from '@/api/menuItems';
 import { listModifiers } from '@/api/modifiers';
+import { getMyRestaurant } from '@/api/restaurants';
 import { Layout } from '@/components/layout/Layout';
 import { CategoryList } from '@/components/menu/CategoryList';
 import { MenuItemCard } from '@/components/menu/MenuItemCard';
@@ -34,6 +37,33 @@ export const MenuBuilder: React.FC = () => {
   const [isItemFormOpen, setIsItemFormOpen] = useState(false);
   const [editingItem, setEditingItem] = useState<MenuItemResponse | null>(null);
   const [mobileActiveTab, setMobileActiveTab] = useState<'items' | 'categories' | 'modifiers'>('items');
+  const [itemToDelete, setItemToDelete] = useState<MenuItemResponse | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
+  const lastFetchedRestaurantId = useRef<string | null>(null);
+  const hasFetchedRestaurant = useRef(false);
+
+  // Fetch restaurant data if missing
+  useEffect(() => {
+    const fetchRestaurant = async () => {
+      if (restaurant || hasFetchedRestaurant.current) return;
+
+      hasFetchedRestaurant.current = true;
+      try {
+        const restaurantData = await getMyRestaurant();
+        dispatch(setRestaurant(restaurantData));
+      } catch (error: any) {
+        // Handle 403 - user not associated with restaurant
+        if (error?.response?.status === 403) {
+          // User doesn't have a restaurant yet
+          // Don't set error state, just continue
+        }
+        // For other errors, silently fail
+      }
+    };
+
+    fetchRestaurant();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // Fetch all data
   const fetchAllData = async () => {
@@ -51,7 +81,7 @@ export const MenuBuilder: React.FC = () => {
       dispatch(setMenuItems(itemsData));
       dispatch(setModifiers(modifiersData));
     } catch (error) {
-      console.error('Failed to fetch menu data:', error);
+      // Error handled by error state
     } finally {
       setIsLoading(false);
       setIsInitialLoad(false);
@@ -59,10 +89,17 @@ export const MenuBuilder: React.FC = () => {
   };
 
   useEffect(() => {
-    if (restaurant && isInitialLoad) {
-      fetchAllData();
+    const restaurantId = restaurant?.id;
+    
+    // Only fetch if restaurant ID changed and we haven't fetched for this ID yet
+    if (!restaurantId || restaurantId === lastFetchedRestaurantId.current) {
+      return;
     }
-  }, [restaurant, isInitialLoad]);
+
+    lastFetchedRestaurantId.current = restaurantId;
+    fetchAllData();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [restaurant?.id]);
 
   // Filter menu items
   const filteredItems = menuItems.filter((item) => {
@@ -99,8 +136,27 @@ export const MenuBuilder: React.FC = () => {
   };
 
   const handleDeleteItem = (item: MenuItemResponse) => {
-    // TODO: Implement delete confirmation dialog
-    console.log('Delete item:', item);
+    setItemToDelete(item);
+  };
+
+  const handleConfirmDelete = async () => {
+    if (!restaurant || !itemToDelete) return;
+
+    setIsDeleting(true);
+    try {
+      await deleteMenuItem(restaurant.id, itemToDelete.id);
+      await fetchAllData();
+      setItemToDelete(null);
+      dispatch(showToast({ message: `"${itemToDelete.name}" has been deleted`, type: 'success' }));
+    } catch (error) {
+      dispatch(showToast({ message: 'Failed to delete menu item. Please try again.', type: 'error' }));
+    } finally {
+      setIsDeleting(false);
+    }
+  };
+
+  const handleCancelDelete = () => {
+    setItemToDelete(null);
   };
 
   const handleItemFormClose = () => {
@@ -382,6 +438,47 @@ export const MenuBuilder: React.FC = () => {
           onClose={handleItemFormClose}
           onSuccess={handleItemFormSuccess}
         />
+      )}
+
+      {/* Delete Confirmation Modal */}
+      {itemToDelete && (
+        <>
+          <div
+            className="fixed inset-0 z-[60] bg-gray-900/50 backdrop-blur-sm"
+            onClick={handleCancelDelete}
+          />
+          <div className="fixed inset-0 z-[60] flex items-center justify-center p-4">
+            <div
+              className="w-full max-w-sm rounded-2xl border border-gray-200 bg-white p-6 shadow-xl"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <h3 className="mb-2 text-lg font-bold text-gray-900">Delete Menu Item?</h3>
+              <p className="mb-6 text-sm text-gray-600">
+                This will permanently remove "{itemToDelete.name}" from your menu. This action cannot be undone.
+              </p>
+              <div className="flex gap-3">
+                <Button
+                  variant="outline"
+                  size="md"
+                  onClick={handleCancelDelete}
+                  disabled={isDeleting}
+                  className="flex-1"
+                >
+                  Cancel
+                </Button>
+                <Button
+                  variant="danger"
+                  size="md"
+                  onClick={handleConfirmDelete}
+                  isLoading={isDeleting}
+                  className="flex-1"
+                >
+                  Delete
+                </Button>
+              </div>
+            </div>
+          </div>
+        </>
       )}
     </Layout>
   );

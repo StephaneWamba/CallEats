@@ -4,7 +4,7 @@ This module provides business logic for menu item image management using Supabas
 It handles image upload, deletion, and URL management.
 
 Key Features:
-    - Image upload to Supabase Storage bucket: menu-images
+    - Image upload to Supabase Storage bucket: menu-items
     - File validation (type, size)
     - Unique filename generation
     - Image URL storage in database
@@ -42,7 +42,7 @@ ALLOWED_IMAGE_TYPES = {
 MAX_FILE_SIZE = 5 * 1024 * 1024  # 5MB in bytes
 
 # Storage bucket name
-STORAGE_BUCKET = "menu-images"
+STORAGE_BUCKET = "menu-items"
 
 
 def _validate_image_file(file_content: bytes, content_type: Optional[str]) -> None:
