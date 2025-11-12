@@ -37,6 +37,24 @@ export interface DeliveryZoneMapProps {
   zoom?: number;
 }
 
+// Component to set map ref for external access
+const MapRefSetter: React.FC<{ mapRef: React.MutableRefObject<L.Map | null> }> = ({ mapRef }) => {
+  const map = useMap();
+  
+  useEffect(() => {
+    if (map) {
+      mapRef.current = map;
+      // Trigger map invalidateSize to ensure proper rendering after container is ready
+      const timer = setTimeout(() => {
+        map.invalidateSize();
+      }, 200);
+      return () => clearTimeout(timer);
+    }
+  }, [map, mapRef]);
+  
+  return null;
+};
+
 // Component to handle drawing on the map
 const DrawingHandler: React.FC<{
   selectedZone: DeliveryZoneResponse | null;
@@ -177,6 +195,30 @@ export const DeliveryZoneMap: React.FC<DeliveryZoneMapProps> = ({
   const [mapZoom, setMapZoom] = useState(zoom);
   const mapRef = useRef<L.Map | null>(null);
 
+  // Update map center/zoom when props change
+  useEffect(() => {
+    if (mapRef.current) {
+      mapRef.current.setView(center, zoom);
+    } else {
+      setMapCenter(center);
+      setMapZoom(zoom);
+    }
+  }, [center, zoom]);
+
+  // Handle window resize to ensure map renders correctly
+  useEffect(() => {
+    const handleResize = () => {
+      if (mapRef.current) {
+        setTimeout(() => {
+          mapRef.current?.invalidateSize();
+        }, 100);
+      }
+    };
+
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
+
   // Zone colors for different zones
   const zoneColors = [
     '#3b82f6', // blue
@@ -252,12 +294,14 @@ export const DeliveryZoneMap: React.FC<DeliveryZoneMapProps> = ({
         <MapContainer
           center={mapCenter}
           zoom={mapZoom}
-          style={{ height: '100%', width: '100%' }}
+          style={{ height: '100%', width: '100%', zIndex: 0 }}
+          scrollWheelZoom={true}
         >
           <TileLayer
             attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
             url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
           />
+          <MapRefSetter mapRef={mapRef} />
           <MapClickHandler onMapClick={handleMapClick} />
 
           {/* Draw existing zone boundaries */}
