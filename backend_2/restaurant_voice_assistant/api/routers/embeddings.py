@@ -43,6 +43,8 @@ from restaurant_voice_assistant.infrastructure.openai.embeddings import (
 )
 from restaurant_voice_assistant.infrastructure.cache.manager import clear_cache
 from restaurant_voice_assistant.infrastructure.auth.service import verify_vapi_secret
+from restaurant_voice_assistant.api.middleware.rate_limit import limiter
+from fastapi import Request
 import logging
 
 router = APIRouter()
@@ -70,7 +72,9 @@ logger = logging.getLogger(__name__)
         500: {"description": "Failed to generate embeddings"}
     }
 )
+@limiter.limit("10/minute")  # Lower limit for expensive operations
 async def generate_embeddings(
+    http_request: Request,
     request: GenerateEmbeddingsRequest,
     x_vapi_secret: Optional[str] = Header(
         None, alias="X-Vapi-Secret", description="Vapi webhook secret")

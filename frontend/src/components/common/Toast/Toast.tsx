@@ -1,21 +1,20 @@
 import React, { useEffect } from 'react';
 import { X, CheckCircle2, AlertCircle, Info, AlertTriangle } from 'lucide-react';
-import { useAppSelector, useAppDispatch } from '@/store/hooks';
-import { hideToast } from '@/store/slices/uiSlice';
+import { useToast } from '@/contexts/ToastContext';
 
 export const Toast: React.FC = () => {
-  const dispatch = useAppDispatch();
-  const toast = useAppSelector((state) => state.ui.toast);
+  const { toast, hideToast } = useToast();
 
   useEffect(() => {
     if (toast) {
+      const duration = toast.duration ?? 5000; // Default 5 seconds if not specified
       const timer = setTimeout(() => {
-        dispatch(hideToast());
-      }, 5000); // Auto-hide after 5 seconds
+        hideToast();
+      }, duration);
 
       return () => clearTimeout(timer);
     }
-  }, [toast, dispatch]);
+  }, [toast, hideToast]);
 
   if (!toast) return null;
 
@@ -43,7 +42,7 @@ export const Toast: React.FC = () => {
         <Icon className="h-5 w-5 flex-shrink-0" />
         <p className="flex-1 text-sm font-medium">{toast.message}</p>
         <button
-          onClick={() => dispatch(hideToast())}
+          onClick={hideToast}
           className="flex-shrink-0 rounded p-1 hover:bg-black/20 transition-colors"
           aria-label="Close toast"
         >

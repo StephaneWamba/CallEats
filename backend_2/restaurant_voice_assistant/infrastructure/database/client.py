@@ -33,12 +33,8 @@ def get_supabase_client() -> Client:
     return create_client(settings.supabase_url, settings.supabase_publishable_key)
 
 
+@lru_cache()
 def get_supabase_service_client() -> Client:
-    """Get Supabase client with secret key (bypasses RLS - for writes and admin operations)."""
+    """Get Supabase client singleton with secret key (bypasses RLS - for writes and admin operations)."""
     settings = get_settings()
     return create_client(settings.supabase_url, settings.supabase_secret_key)
-
-    service_key = os.environ.get("SUPABASE_SERVICE_ROLE_KEY")
-    if not service_key:
-        service_key = settings.supabase_anon_key
-    return create_client(settings.supabase_url, service_key)

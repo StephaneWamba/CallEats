@@ -28,7 +28,7 @@ Usage:
 """
 from typing import List, Dict, Any, Optional
 from restaurant_voice_assistant.infrastructure.database.client import get_supabase_service_client
-from restaurant_voice_assistant.infrastructure.cache.manager import clear_cache
+from restaurant_voice_assistant.infrastructure.cache.invalidation import invalidate_cache
 import logging
 
 logger = logging.getLogger(__name__)
@@ -89,6 +89,7 @@ def get_operating_hour(restaurant_id: str, hour_id: str) -> Optional[Dict[str, A
         raise
 
 
+@invalidate_cache(category="hours")
 def update_operating_hours(
     restaurant_id: str,
     hours: List[Dict[str, Any]]
@@ -131,10 +132,8 @@ def update_operating_hours(
             if not resp.data:
                 raise Exception("Failed to update operating hours")
 
-            clear_cache(restaurant_id, "hours")
             return resp.data
         else:
-            clear_cache(restaurant_id, "hours")
             return []
     except Exception as e:
         logger.error(
@@ -142,6 +141,7 @@ def update_operating_hours(
         raise
 
 
+@invalidate_cache(category="hours")
 def delete_operating_hours(restaurant_id: str) -> bool:
     """Delete all operating hours for a restaurant.
 
@@ -160,7 +160,6 @@ def delete_operating_hours(restaurant_id: str) -> bool:
         supabase.table("operating_hours").delete().eq(
             "restaurant_id", restaurant_id).execute()
 
-        clear_cache(restaurant_id, "hours")
         return True
     except Exception as e:
         logger.error(

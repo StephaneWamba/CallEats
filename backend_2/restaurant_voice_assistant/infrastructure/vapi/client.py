@@ -33,6 +33,7 @@ import requests
 import logging
 from typing import Dict, Any, Optional, List
 from restaurant_voice_assistant.core.exceptions import VapiAPIError
+from restaurant_voice_assistant.infrastructure.retry import retry_with_backoff
 
 logger = logging.getLogger(__name__)
 
@@ -57,13 +58,14 @@ class VapiClient:
             "Content-Type": "application/json"
         }
 
+    @retry_with_backoff
     def _request(
         self,
         method: str,
         endpoint: str,
         json_data: Optional[Dict[str, Any]] = None
     ) -> requests.Response:
-        """Make HTTP request.
+        """Make HTTP request with retry logic.
 
         Args:
             method: HTTP method (GET, POST, DELETE, etc.)
@@ -74,7 +76,7 @@ class VapiClient:
             Response object
 
         Raises:
-            VapiAPIError: If request fails
+            VapiAPIError: If request fails after retries
         """
         url = f"{self.base_url}{endpoint}"
 
@@ -86,6 +88,8 @@ class VapiClient:
                 json=json_data,
                 timeout=30
             )
+            # Check for HTTP error status codes
+            response.raise_for_status()
             return response
         except requests.exceptions.RequestException as e:
             raise VapiAPIError(f"API request failed: {e}") from e

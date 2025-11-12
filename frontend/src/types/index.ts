@@ -10,6 +10,9 @@ export interface PaginatedResponse<T> {
   page_size: number;
 }
 
+// Re-export standardized error types
+export type { StandardizedError } from '@/utils/errorHandler';
+
 // Re-export all types
 export * from './auth';
 export * from './restaurant';

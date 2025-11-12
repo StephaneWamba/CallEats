@@ -27,7 +27,7 @@ Usage:
 from typing import List, Dict, Any, Optional
 from decimal import Decimal
 from restaurant_voice_assistant.infrastructure.database.client import get_supabase_service_client
-from restaurant_voice_assistant.infrastructure.cache.manager import clear_cache
+from restaurant_voice_assistant.infrastructure.cache.invalidation import invalidate_cache
 import logging
 
 logger = logging.getLogger(__name__)
@@ -88,6 +88,7 @@ def get_modifier(restaurant_id: str, modifier_id: str) -> Optional[Dict[str, Any
         raise
 
 
+@invalidate_cache(category="modifiers")
 def create_modifier(
     restaurant_id: str,
     name: str,
@@ -123,8 +124,6 @@ def create_modifier(
 
         modifier = resp.data[0]
 
-        clear_cache(restaurant_id, "modifiers")
-
         return modifier
     except Exception as e:
         logger.error(
@@ -132,6 +131,7 @@ def create_modifier(
         raise
 
 
+@invalidate_cache(category="modifiers")
 def update_modifier(
     restaurant_id: str,
     modifier_id: str,
@@ -174,8 +174,6 @@ def update_modifier(
         if not resp.data:
             return None
 
-        clear_cache(restaurant_id, "modifiers")
-
         return resp.data[0]
     except Exception as e:
         logger.error(
@@ -183,6 +181,7 @@ def update_modifier(
         raise
 
 
+@invalidate_cache(category="modifiers")
 def delete_modifier(restaurant_id: str, modifier_id: str) -> bool:
     """Delete a modifier.
 
@@ -203,7 +202,6 @@ def delete_modifier(restaurant_id: str, modifier_id: str) -> bool:
             "restaurant_id", restaurant_id).eq("id", modifier_id).execute()
 
         if resp.data:
-            clear_cache(restaurant_id, "modifiers")
             return True
         return False
     except Exception as e:

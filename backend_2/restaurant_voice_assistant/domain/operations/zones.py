@@ -34,7 +34,7 @@ Usage:
 from typing import List, Dict, Any, Optional
 from decimal import Decimal
 from restaurant_voice_assistant.infrastructure.database.client import get_supabase_service_client
-from restaurant_voice_assistant.infrastructure.cache.manager import clear_cache
+from restaurant_voice_assistant.infrastructure.cache.invalidation import invalidate_cache
 import logging
 
 logger = logging.getLogger(__name__)
@@ -95,6 +95,7 @@ def get_delivery_zone(restaurant_id: str, zone_id: str) -> Optional[Dict[str, An
         raise
 
 
+@invalidate_cache(category="zones")
 def create_delivery_zone(
     restaurant_id: str,
     zone_name: str,
@@ -136,8 +137,6 @@ def create_delivery_zone(
 
         zone = resp.data[0]
 
-        clear_cache(restaurant_id, "zones")
-
         return zone
     except Exception as e:
         logger.error(
@@ -145,6 +144,7 @@ def create_delivery_zone(
         raise
 
 
+@invalidate_cache(category="zones")
 def update_delivery_zone(
     restaurant_id: str,
     zone_id: str,
@@ -191,8 +191,6 @@ def update_delivery_zone(
         if not resp.data:
             return None
 
-        clear_cache(restaurant_id, "zones")
-
         return resp.data[0]
     except Exception as e:
         logger.error(
@@ -200,6 +198,7 @@ def update_delivery_zone(
         raise
 
 
+@invalidate_cache(category="zones")
 def delete_delivery_zone(restaurant_id: str, zone_id: str) -> bool:
     """Delete a delivery zone.
 
@@ -220,7 +219,6 @@ def delete_delivery_zone(restaurant_id: str, zone_id: str) -> bool:
             "restaurant_id", restaurant_id).eq("id", zone_id).execute()
 
         if resp.data:
-            clear_cache(restaurant_id, "zones")
             return True
         return False
     except Exception as e:

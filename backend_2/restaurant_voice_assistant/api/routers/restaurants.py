@@ -47,6 +47,7 @@ from restaurant_voice_assistant.infrastructure.auth.service import (
     get_restaurant_id
 )
 from restaurant_voice_assistant.api.middleware.request_id import get_request_id
+import asyncio
 import logging
 
 router = APIRouter()
@@ -63,7 +64,7 @@ logger = logging.getLogger(__name__)
     summary="Create Restaurant",
     description="Create a new restaurant with optional automatic phone number assignment."
 )
-def create_restaurant(
+async def create_restaurant(
     request: CreateRestaurantRequest,
     http_request: Request,
     x_vapi_secret: Optional[str] = Header(
@@ -78,7 +79,9 @@ def create_restaurant(
     require_auth(http_request, x_vapi_secret)
 
     try:
-        restaurant_data = create_restaurant_service(
+        # Run sync database operation in thread pool to avoid blocking
+        restaurant_data = await asyncio.to_thread(
+            create_restaurant_service,
             name=request.name,
             api_key=request.api_key,
             assign_phone=request.assign_phone,
@@ -119,7 +122,7 @@ def create_restaurant(
         500: {"description": "Failed to fetch restaurant"}
     }
 )
-def get_my_restaurant(request: Request):
+async def get_my_restaurant(request: Request):
     """Get the current authenticated user's restaurant.
 
     Extracts restaurant_id from JWT token automatically.
@@ -129,7 +132,8 @@ def get_my_restaurant(request: Request):
     restaurant_id = get_restaurant_id(request)
 
     try:
-        restaurant_data = get_restaurant_service(restaurant_id)
+        # Run sync database operation in thread pool to avoid blocking
+        restaurant_data = await asyncio.to_thread(get_restaurant_service, restaurant_id)
         if not restaurant_data:
             raise HTTPException(
                 status_code=404, detail="Restaurant not found")
@@ -167,7 +171,7 @@ def get_my_restaurant(request: Request):
         500: {"description": "Failed to update restaurant"}
     }
 )
-def update_restaurant(
+async def update_restaurant(
     http_request: Request,
     restaurant_id: str = Path(..., description="Restaurant UUID"),
     request: UpdateRestaurantRequest = ...,
@@ -178,7 +182,9 @@ def update_restaurant(
     require_restaurant_access(http_request, restaurant_id, x_vapi_secret)
 
     try:
-        restaurant_data = update_restaurant_service(
+        # Run sync database operation in thread pool to avoid blocking
+        restaurant_data = await asyncio.to_thread(
+            update_restaurant_service,
             restaurant_id=restaurant_id,
             name=request.name
         )
@@ -220,7 +226,7 @@ def update_restaurant(
         500: {"description": "Failed to fetch statistics"}
     }
 )
-def get_restaurant_stats(
+async def get_restaurant_stats(
     request: Request,
     restaurant_id: str = Path(..., description="Restaurant UUID"),
     x_vapi_secret: Optional[str] = Header(
@@ -230,7 +236,8 @@ def get_restaurant_stats(
     require_restaurant_access(request, restaurant_id, x_vapi_secret)
 
     try:
-        stats = get_restaurant_stats_service(restaurant_id)
+        # Run sync database operation in thread pool to avoid blocking
+        stats = await asyncio.to_thread(get_restaurant_stats_service, restaurant_id)
         return RestaurantStatsResponse(**stats)
     except HTTPException:
         raise
@@ -258,7 +265,7 @@ def get_restaurant_stats(
         500: {"description": "Failed to delete restaurant"}
     }
 )
-def delete_restaurant(
+async def delete_restaurant(
     request: Request,
     restaurant_id: str = Path(..., description="Restaurant UUID"),
     x_vapi_secret: Optional[str] = Header(
@@ -269,7 +276,8 @@ def delete_restaurant(
     require_restaurant_access(request, restaurant_id, None)
 
     try:
-        deleted = delete_restaurant_service(restaurant_id)
+        # Run sync database operation in thread pool to avoid blocking
+        deleted = await asyncio.to_thread(delete_restaurant_service, restaurant_id)
         if not deleted:
             raise HTTPException(
                 status_code=404, detail="Restaurant not found")

@@ -1,13 +1,12 @@
-import React, { useEffect, useState, useRef } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Clock, Save } from 'lucide-react';
-import { useAppSelector, useAppDispatch } from '@/store/hooks';
-import { showToast } from '@/store/slices/uiSlice';
-import { listOperatingHours, bulkUpdateOperatingHours } from '@/api/operatingHours';
+import { useRestaurant } from '@/hooks/useRestaurant';
+import { useOperatingHours, useUpdateOperatingHours } from '@/features/operating-hours/hooks';
 import { Layout } from '@/components/layout/Layout';
 import { Button } from '@/components/common/Button';
-import { LoadingSpinner } from '@/components/common/LoadingSpinner';
+import { PageSkeleton } from '@/components/common/Skeleton';
 import { EmptyState } from '@/components/common/EmptyState';
-import type { OperatingHourResponse, OperatingHourRequest } from '@/types/operating-hours';
+import type { OperatingHourRequest } from '@/types/operating-hours';
 
 const DAYS_OF_WEEK = [
   'Monday',
@@ -20,14 +19,9 @@ const DAYS_OF_WEEK = [
 ] as const;
 
 export const OperatingHours: React.FC = () => {
-  const dispatch = useAppDispatch();
-  const { restaurant } = useAppSelector((state) => state.restaurant);
-  const [hours, setHours] = useState<OperatingHourResponse[]>([]);
-  const [isLoading, setIsLoading] = useState(false);
-  const [isSaving, setIsSaving] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [success, setSuccess] = useState(false);
-  const lastFetchedRestaurantId = useRef<string | null>(null);
+  const { data: restaurant, isLoading: isLoadingRestaurant } = useRestaurant();
+  const { data: hours, isLoading } = useOperatingHours(restaurant?.id);
+  const updateHoursMutation = useUpdateOperatingHours();
 
   // Initialize form data with default hours
   const [formData, setFormData] = useState<Record<string, OperatingHourRequest>>(() => {
@@ -43,51 +37,21 @@ export const OperatingHours: React.FC = () => {
     return defaultHours;
   });
 
-  // Fetch existing hours
+  // Populate form with existing hours when data loads
   useEffect(() => {
-    const restaurantId = restaurant?.id;
-    
-    // Only fetch if restaurant ID changed
-    if (!restaurantId || restaurantId === lastFetchedRestaurantId.current) {
-      return;
+    if (hours && hours.length > 0) {
+      const hoursMap: Record<string, OperatingHourRequest> = {};
+      hours.forEach((hour) => {
+        hoursMap[hour.day_of_week] = {
+          day_of_week: hour.day_of_week,
+          open_time: hour.open_time,
+          close_time: hour.close_time,
+          is_closed: hour.is_closed,
+        };
+      });
+      setFormData((prev) => ({ ...prev, ...hoursMap }));
     }
-
-    lastFetchedRestaurantId.current = restaurantId;
-
-    const fetchHours = async () => {
-      setIsLoading(true);
-      setError(null);
-      try {
-        const data = await listOperatingHours(restaurantId);
-        setHours(data);
-
-        // Populate form with existing hours
-        if (data.length > 0) {
-          const hoursMap: Record<string, OperatingHourRequest> = {};
-          data.forEach((hour) => {
-            hoursMap[hour.day_of_week] = {
-              day_of_week: hour.day_of_week,
-              open_time: hour.open_time,
-              close_time: hour.close_time,
-              is_closed: hour.is_closed,
-            };
-          });
-          setFormData((prev) => ({ ...prev, ...hoursMap }));
-        }
-      } catch (err: any) {
-        // Handle 403 - user not associated with restaurant
-        if (err?.response?.status === 403) {
-          setError('You are not associated with a restaurant. Please contact support.');
-        } else {
-          setError('Failed to load operating hours');
-        }
-      } finally {
-        setIsLoading(false);
-      }
-    };
-
-    fetchHours();
-  }, [restaurant?.id]);
+  }, [hours]);
 
   const handleDayChange = (day: string, field: keyof OperatingHourRequest, value: string | boolean) => {
     setFormData((prev) => ({
@@ -102,27 +66,24 @@ export const OperatingHours: React.FC = () => {
   const handleSave = async () => {
     if (!restaurant) return;
 
-    setIsSaving(true);
-    setError(null);
-    setSuccess(false);
-
     try {
       const hoursArray: OperatingHourRequest[] = DAYS_OF_WEEK.map((day) => formData[day]);
-      await bulkUpdateOperatingHours(restaurant.id, { hours: hoursArray });
-
-      // Refresh hours
-      const updatedHours = await listOperatingHours(restaurant.id);
-      setHours(updatedHours);
-      setSuccess(true);
-      dispatch(showToast({ message: 'Operating hours updated successfully!', type: 'success' }));
-    } catch (err) {
-      const errorMessage = 'Failed to save operating hours. Please try again.';
-      setError(errorMessage);
-      dispatch(showToast({ message: errorMessage, type: 'error' }));
-    } finally {
-      setIsSaving(false);
+      await updateHoursMutation.mutateAsync({
+        restaurantId: restaurant.id,
+        data: { hours: hoursArray },
+      });
+    } catch (_error) {
+      // Error handled by mutation
     }
   };
+
+  if (isLoadingRestaurant) {
+    return (
+      <Layout>
+        <PageSkeleton />
+      </Layout>
+    );
+  }
 
   if (!restaurant) {
     return (
@@ -143,9 +104,7 @@ export const OperatingHours: React.FC = () => {
   if (isLoading) {
     return (
       <Layout>
-        <div className="flex min-h-[400px] items-center justify-center">
-          <LoadingSpinner size="lg" />
-        </div>
+        <PageSkeleton />
       </Layout>
     );
   }
@@ -161,17 +120,6 @@ export const OperatingHours: React.FC = () => {
           </p>
         </div>
 
-        {/* Success/Error Messages */}
-        {success && (
-          <div className="rounded-lg bg-success/10 border border-success p-4 text-success">
-            Operating hours updated successfully!
-          </div>
-        )}
-        {error && (
-          <div className="rounded-lg bg-error/10 border border-error p-4 text-error">
-            {error}
-          </div>
-        )}
 
         {/* Hours Form */}
         <div className="rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
@@ -243,8 +191,8 @@ export const OperatingHours: React.FC = () => {
               onClick={handleSave}
               variant="primary"
               size="md"
-              isLoading={isSaving}
-              disabled={isSaving}
+              isLoading={updateHoursMutation.isPending}
+              disabled={updateHoursMutation.isPending}
             >
               <Save className="mr-2 h-4 w-4" />
               Save Hours

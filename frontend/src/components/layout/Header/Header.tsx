@@ -1,8 +1,8 @@
 import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Menu, User, LogOut, Settings as SettingsIcon } from 'lucide-react';
-import { useAppSelector, useAppDispatch } from '../../../store/hooks';
-import { logout } from '../../../store/slices/authSlice';
+import { useAuth } from '../../../contexts/AuthContext';
+import { useRestaurant } from '../../../hooks/useRestaurant';
 import { ROUTES } from '../../../config/routes';
 import { Logo } from '../../common/Logo';
 
@@ -12,12 +12,11 @@ interface HeaderProps {
 
 export const Header: React.FC<HeaderProps> = ({ onMenuToggle }) => {
   const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
-  const dispatch = useAppDispatch();
-  const { user } = useAppSelector((state) => state.auth);
-  const { restaurant: currentRestaurant } = useAppSelector((state) => state.restaurant);
+  const { user, logout } = useAuth();
+  const { data: currentRestaurant } = useRestaurant();
 
-  const handleLogout = () => {
-    dispatch(logout());
+  const handleLogout = async () => {
+    await logout();
   };
 
   return (
@@ -36,7 +35,7 @@ export const Header: React.FC<HeaderProps> = ({ onMenuToggle }) => {
           <Link to={ROUTES.DASHBOARD} className="flex items-center">
             <Logo size="sm" showText={false} />
             <span className="ml-2 hidden text-xl font-bold text-gray-900 sm:inline">
-              Voice Assistant
+              CallEats
             </span>
           </Link>
         </div>

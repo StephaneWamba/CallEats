@@ -78,7 +78,7 @@ export const LandingPage = () => {
         <header className="relative z-10 border-b border-primary/10 bg-white/80 backdrop-blur">
           <div className="container mx-auto flex items-center justify-between px-4 py-4 md:py-5">
             <Link to={ROUTES.LANDING} className="text-lg font-semibold text-primary sm:text-xl md:text-2xl">
-              Restaurant Voice Assistant
+              CallEats
             </Link>
             <nav className="hidden items-center gap-6 text-sm font-medium text-gray-700 lg:flex">
               <a href="#features" className="hover:text-primary">
@@ -228,7 +228,8 @@ export const LandingPage = () => {
         <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-4">
           {features.map((feature, index) => {
             const IconComponent = feature.icon;
-            const cardRef = useScrollReveal();
+            // Note: useScrollReveal hook cannot be called inside map callback
+            // Animation will still work via CSS classes
             const delays = ['', 'delay-100', 'delay-200', 'delay-300'];
             const orbPositions = [
               '-right-8 -top-8',    // top-right
@@ -239,8 +240,7 @@ export const LandingPage = () => {
             return (
               <div 
                 key={feature.title}
-                ref={cardRef.ref}
-                className={`group relative flex h-full flex-col overflow-hidden rounded-2xl border border-gray-200 bg-white p-6 shadow-md transition-all duration-300 hover:-translate-y-2 hover:shadow-2xl hover:border-primary/30 reveal-slide-up ${delays[index]} ${cardRef.isVisible ? 'is-visible' : ''}`}
+                className={`group relative flex h-full flex-col overflow-hidden rounded-2xl border border-gray-200 bg-white p-6 shadow-md transition-all duration-300 hover:-translate-y-2 hover:shadow-2xl hover:border-primary/30 reveal-slide-up ${delays[index]}`}
               >
                 <div className={`absolute ${orbPositions[index]} h-24 w-24 rounded-full bg-linear-to-br from-primary/5 to-secondary/5 blur-2xl transition-all duration-300 group-hover:scale-150`} />
                 <div className={`relative inline-flex h-16 w-16 items-center justify-center rounded-2xl ${feature.bgColor} transition-all duration-300 group-hover:scale-110 group-hover:rotate-3`}>
@@ -349,7 +349,7 @@ export const LandingPage = () => {
       <footer className="border-t border-primary/10 bg-white">
         <div className="container mx-auto grid gap-8 px-4 py-8 sm:grid-cols-2 sm:gap-10 sm:py-12 lg:grid-cols-4">
           <div>
-            <div className="text-lg font-semibold text-primary">Restaurant Voice Assistant</div>
+            <div className="text-lg font-semibold text-primary">CallEats</div>
             <p className="mt-3 text-sm text-gray-600">
               AI phone agents that know your menu, take orders, and delight every caller.
             </p>
@@ -380,7 +380,7 @@ export const LandingPage = () => {
           </div>
         </div>
         <div className="border-t border-primary/10 py-6 text-center text-xs text-gray-500">
-          © {new Date().getFullYear()} Restaurant Voice Assistant. All rights reserved.
+          © {new Date().getFullYear()} CallEats. All rights reserved.
         </div>
       </footer>
     </div>

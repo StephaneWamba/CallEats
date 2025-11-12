@@ -18,7 +18,7 @@ import argparse
 from typing import Optional, Dict, Any
 from pathlib import Path
 
-# Add backend_2 to path for imports
+# Add backend to path for imports
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 

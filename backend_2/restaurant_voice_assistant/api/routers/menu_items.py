@@ -65,6 +65,7 @@ from restaurant_voice_assistant.infrastructure.openai.embeddings import (
     add_embedding_task
 )
 from restaurant_voice_assistant.api.middleware.request_id import get_request_id
+import asyncio
 import logging
 
 router = APIRouter()
@@ -83,7 +84,7 @@ logger = logging.getLogger(__name__)
         500: {"description": "Failed to fetch menu items"}
     }
 )
-def list_menu_items(
+async def list_menu_items(
     request: Request,
     restaurant_id: str = Path(..., description="Restaurant UUID"),
     x_vapi_secret: Optional[str] = Header(
@@ -93,7 +94,7 @@ def list_menu_items(
     require_restaurant_access(request, restaurant_id, x_vapi_secret)
 
     try:
-        items = list_menu_items_service(restaurant_id)
+        items = await asyncio.to_thread(list_menu_items_service, restaurant_id)
         return items
     except Exception as e:
         logger.error(
@@ -116,7 +117,7 @@ def list_menu_items(
         500: {"description": "Failed to fetch menu item"}
     }
 )
-def get_menu_item(
+async def get_menu_item(
     request: Request,
     restaurant_id: str = Path(..., description="Restaurant UUID"),
     item_id: str = Path(..., description="Menu item UUID"),
@@ -127,7 +128,7 @@ def get_menu_item(
     require_restaurant_access(request, restaurant_id, x_vapi_secret)
 
     try:
-        item = get_menu_item_service(restaurant_id, item_id)
+        item = await asyncio.to_thread(get_menu_item_service, restaurant_id, item_id)
         if not item:
             raise HTTPException(
                 status_code=404, detail="Menu item not found")
@@ -155,7 +156,7 @@ def get_menu_item(
         500: {"description": "Failed to create menu item"}
     }
 )
-def create_menu_item(
+async def create_menu_item(
     http_request: Request,
     background_tasks: BackgroundTasks,
     restaurant_id: str = Path(..., description="Restaurant UUID"),
@@ -167,7 +168,8 @@ def create_menu_item(
     require_restaurant_access(http_request, restaurant_id, x_vapi_secret)
 
     try:
-        item = create_menu_item_service(
+        item = await asyncio.to_thread(
+            create_menu_item_service,
             restaurant_id=restaurant_id,
             name=request.name,
             description=request.description,
@@ -202,7 +204,7 @@ def create_menu_item(
         500: {"description": "Failed to update menu item"}
     }
 )
-def update_menu_item(
+async def update_menu_item(
     http_request: Request,
     background_tasks: BackgroundTasks,
     restaurant_id: str = Path(..., description="Restaurant UUID"),
@@ -215,7 +217,8 @@ def update_menu_item(
     require_restaurant_access(http_request, restaurant_id, x_vapi_secret)
 
     try:
-        item = update_menu_item_service(
+        item = await asyncio.to_thread(
+            update_menu_item_service,
             restaurant_id=restaurant_id,
             item_id=item_id,
             name=request.name,
@@ -255,7 +258,7 @@ def update_menu_item(
         500: {"description": "Failed to delete menu item"}
     }
 )
-def delete_menu_item(
+async def delete_menu_item(
     http_request: Request,
     background_tasks: BackgroundTasks,
     restaurant_id: str = Path(..., description="Restaurant UUID"),
@@ -267,7 +270,7 @@ def delete_menu_item(
     require_restaurant_access(http_request, restaurant_id, x_vapi_secret)
 
     try:
-        deleted = delete_menu_item_service(restaurant_id, item_id)
+        deleted = await asyncio.to_thread(delete_menu_item_service, restaurant_id, item_id)
         if not deleted:
             raise HTTPException(
                 status_code=404, detail="Menu item not found")
@@ -301,7 +304,7 @@ def delete_menu_item(
         500: {"description": "Failed to link modifier"}
     }
 )
-def link_modifier(
+async def link_modifier(
     http_request: Request,
     restaurant_id: str = Path(..., description="Restaurant UUID"),
     item_id: str = Path(..., description="Menu item UUID"),
@@ -313,7 +316,8 @@ def link_modifier(
     require_restaurant_access(http_request, restaurant_id, x_vapi_secret)
 
     try:
-        link = link_modifier_to_item(
+        link = await asyncio.to_thread(
+            link_modifier_to_item,
             restaurant_id=restaurant_id,
             menu_item_id=item_id,
             modifier_id=request.modifier_id,
@@ -345,7 +349,7 @@ def link_modifier(
         500: {"description": "Failed to unlink modifier"}
     }
 )
-def unlink_modifier(
+async def unlink_modifier(
     http_request: Request,
     restaurant_id: str = Path(..., description="Restaurant UUID"),
     item_id: str = Path(..., description="Menu item UUID"),
@@ -357,7 +361,8 @@ def unlink_modifier(
     require_restaurant_access(http_request, restaurant_id, x_vapi_secret)
 
     try:
-        unlinked = unlink_modifier_from_item(
+        unlinked = await asyncio.to_thread(
+            unlink_modifier_from_item,
             restaurant_id=restaurant_id,
             menu_item_id=item_id,
             modifier_id=modifier_id
@@ -405,7 +410,7 @@ async def upload_image(
 
     try:
         # Verify menu item exists
-        item = get_menu_item_service(restaurant_id, item_id)
+        item = await asyncio.to_thread(get_menu_item_service, restaurant_id, item_id)
         if not item:
             raise HTTPException(
                 status_code=404, detail="Menu item not found")
@@ -414,12 +419,13 @@ async def upload_image(
         file_content = await file.read()
 
         # Upload image
-        image_url = upload_menu_item_image(
-            restaurant_id=restaurant_id,
-            item_id=item_id,
-            file_content=file_content,
-            filename=file.filename or "image.jpg",
-            content_type=file.content_type
+        image_url = await asyncio.to_thread(
+            upload_menu_item_image,
+            restaurant_id,
+            item_id,
+            file_content,
+            file.filename or "image.jpg",
+            file.content_type
         )
 
         return {
@@ -452,7 +458,7 @@ async def upload_image(
         500: {"description": "Failed to delete image"}
     }
 )
-def delete_image(
+async def delete_image(
     http_request: Request,
     restaurant_id: str = Path(..., description="Restaurant UUID"),
     item_id: str = Path(..., description="Menu item UUID"),
@@ -463,7 +469,7 @@ def delete_image(
     require_restaurant_access(http_request, restaurant_id, x_vapi_secret)
 
     try:
-        deleted = delete_menu_item_image(restaurant_id, item_id)
+        deleted = await asyncio.to_thread(delete_menu_item_image, restaurant_id, item_id)
         if not deleted:
             raise HTTPException(
                 status_code=404, detail="Image not found")

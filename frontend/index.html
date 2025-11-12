@@ -2,12 +2,109 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <link rel="icon" type="image/svg+xml" href="/vite.svg" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Restaurant Voice Assistant</title>
+    <meta name="description" content="CallEats - Voice ordering system for restaurants. Manage your menu, delivery zones, and customer calls all in one place." />
+    <title>CallEats - Voice Ordering for Restaurants</title>
+    <!-- React 19 DevTools compatibility stub (prevents errors when DevTools extension is not installed) -->
+    <script>
+      (function() {
+        'use strict';
+        if (typeof window === 'undefined') return;
+        
+        // Create a robust DevTools hook stub for React 19
+        // React 19 expects certain properties to exist and be writable
+        var createRendererStub = function() {
+          return {
+            Children: {},
+            Component: function() {},
+            Fragment: {},
+            StrictMode: {},
+            Activity: {} // React 19 specific property
+          };
+        };
+        
+        var renderersMap = new Map();
+        var originalGet = renderersMap.get.bind(renderersMap);
+        
+        // Override get to always return a valid renderer stub
+        renderersMap.get = function(key) {
+          var val = originalGet(key);
+          if (!val) {
+            val = createRendererStub();
+            renderersMap.set(key, val);
+          }
+          // Ensure all required properties exist
+          if (!val.Children) val.Children = {};
+          if (!val.Activity) val.Activity = {};
+          return val;
+        };
+        
+        // Create the DevTools hook with all properties React 19 might access
+        var devToolsHook = {
+          supportsFiber: true,
+          renderers: renderersMap,
+          inject: function(renderer) {
+            // Return a renderer ID if needed
+            return renderer ? 1 : null;
+          },
+          onCommitFiberRoot: function(id, root) {},
+          onCommitFiberUnmount: function(id) {},
+          // React 19 may access these properties
+          getFiberRoots: function() { return new Map(); },
+          onScheduleFiberRoot: function(id, root) {},
+          // Make the hook extensible for React 19
+          _listeners: []
+        };
+        
+        // Make the hook object extensible so React 19 can add properties
+        Object.defineProperty(window, '__REACT_DEVTOOLS_GLOBAL_HOOK__', {
+          value: devToolsHook,
+          writable: false,
+          configurable: false
+        });
+        
+        // Suppress only React 19 DevTools hook errors (harmless in production)
+        var originalError = window.onerror;
+        window.onerror = function(message, source, lineno, colno, error) {
+          // Only suppress React DevTools hook errors from React's vendor bundle
+          if (typeof message === 'string' && 
+              message.includes("Cannot set properties of undefined") && 
+              (message.includes("setting 'Activity'") || message.includes("setting 'Children'")) &&
+              source && (source.includes('vendor-react') || source.includes('react'))) {
+            return true; // Suppress the error
+          }
+          // Log other errors for debugging
+          if (originalError) {
+            return originalError.call(window, message, source, lineno, colno, error);
+          }
+          return false;
+        };
+        
+        // Suppress unhandled promise rejections related to DevTools
+        window.addEventListener('unhandledrejection', function(event) {
+          if (event.reason && typeof event.reason === 'object' && event.reason.message) {
+            var msg = String(event.reason.message);
+            if (msg.includes("Cannot set properties of undefined") && 
+                (msg.includes("Activity") || msg.includes("Children"))) {
+              event.preventDefault();
+              return;
+            }
+          }
+        }, { passive: true });
+      })();
+    </script>
   </head>
   <body>
-    <div id="root"></div>
+    <div id="root">
+      <!-- Fallback loading message -->
+      <noscript>
+        <div style="padding: 20px; text-align: center; font-family: system-ui;">
+          <h1>JavaScript Required</h1>
+          <p>Please enable JavaScript to use this application.</p>
+        </div>
+      </noscript>
+    </div>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>

@@ -27,7 +27,7 @@ Usage:
 """
 from typing import List, Dict, Any, Optional
 from restaurant_voice_assistant.infrastructure.database.client import get_supabase_service_client
-from restaurant_voice_assistant.infrastructure.cache.manager import clear_cache
+from restaurant_voice_assistant.infrastructure.cache.invalidation import invalidate_cache
 import logging
 
 logger = logging.getLogger(__name__)
@@ -88,6 +88,7 @@ def get_category(restaurant_id: str, category_id: str) -> Optional[Dict[str, Any
         raise
 
 
+@invalidate_cache(category="menu")  # Categories affect menu items
 def create_category(
     restaurant_id: str,
     name: str,
@@ -130,8 +131,6 @@ def create_category(
 
         category = resp.data[0]
 
-        clear_cache(restaurant_id, "menu")  # Categories affect menu items
-
         return category
     except ValueError:
         raise
@@ -141,6 +140,7 @@ def create_category(
         raise
 
 
+@invalidate_cache(category="menu")  # Categories affect menu items
 def update_category(
     restaurant_id: str,
     category_id: str,
@@ -189,8 +189,6 @@ def update_category(
         if not resp.data:
             return None
 
-        clear_cache(restaurant_id, "menu")
-
         return resp.data[0]
     except ValueError:
         raise
@@ -200,6 +198,7 @@ def update_category(
         raise
 
 
+@invalidate_cache(category="menu")  # Categories affect menu items
 def delete_category(restaurant_id: str, category_id: str) -> bool:
     """Delete a category.
 
@@ -220,7 +219,6 @@ def delete_category(restaurant_id: str, category_id: str) -> bool:
             "restaurant_id", restaurant_id).eq("id", category_id).execute()
 
         if resp.data:
-            clear_cache(restaurant_id, "menu")
             return True
         return False
     except Exception as e:

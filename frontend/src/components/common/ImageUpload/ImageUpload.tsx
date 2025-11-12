@@ -1,5 +1,6 @@
 import React, { useState, useRef } from 'react';
 import { Upload, X, ImageOff } from 'lucide-react';
+import { LazyImage } from '@/shared/components/LazyImage';
 
 interface ImageUploadProps {
   currentImageUrl?: string | null;
@@ -119,10 +120,11 @@ export const ImageUpload: React.FC<ImageUploadProps> = ({
       >
         {previewUrl ? (
           <>
-            <img
+            <LazyImage
               src={previewUrl}
               alt="Preview"
               className="h-full w-full object-cover"
+              enableWebP={true}
             />
             {!disabled && (
               <button

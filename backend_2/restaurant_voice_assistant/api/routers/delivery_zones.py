@@ -60,6 +60,7 @@ from restaurant_voice_assistant.infrastructure.openai.embeddings import (
     add_embedding_task
 )
 from restaurant_voice_assistant.api.middleware.request_id import get_request_id
+import asyncio
 import logging
 
 router = APIRouter()
@@ -78,7 +79,7 @@ logger = logging.getLogger(__name__)
         500: {"description": "Failed to fetch delivery zones"}
     }
 )
-def list_delivery_zones(
+async def list_delivery_zones(
     request: Request,
     restaurant_id: str = Path(..., description="Restaurant UUID"),
     x_vapi_secret: Optional[str] = Header(
@@ -88,7 +89,7 @@ def list_delivery_zones(
     require_restaurant_access(request, restaurant_id, x_vapi_secret)
 
     try:
-        items = list_delivery_zones_service(restaurant_id)
+        items = await asyncio.to_thread(list_delivery_zones_service, restaurant_id)
         return items
     except Exception as e:
         logger.error(
@@ -109,7 +110,7 @@ def list_delivery_zones(
         422: {"description": "Missing lat/lng parameters"}
     }
 )
-def check_point_in_zone(
+async def check_point_in_zone(
     request: Request,
     restaurant_id: str = Path(..., description="Restaurant UUID"),
     lat: float = Query(..., description="Latitude", ge=-90, le=90),
@@ -125,7 +126,8 @@ def check_point_in_zone(
             check_point_in_zone as check_point_service
         )
 
-        zone = check_point_service(
+        zone = await asyncio.to_thread(
+            check_point_service,
             restaurant_id=restaurant_id,
             latitude=lat,
             longitude=lng
@@ -165,7 +167,7 @@ def check_point_in_zone(
         500: {"description": "Failed to fetch delivery zone"}
     }
 )
-def get_delivery_zone(
+async def get_delivery_zone(
     request: Request,
     restaurant_id: str = Path(..., description="Restaurant UUID"),
     zone_id: str = Path(..., description="Delivery zone UUID"),
@@ -176,7 +178,7 @@ def get_delivery_zone(
     require_restaurant_access(request, restaurant_id, x_vapi_secret)
 
     try:
-        item = get_delivery_zone_service(restaurant_id, zone_id)
+        item = await asyncio.to_thread(get_delivery_zone_service, restaurant_id, zone_id)
         if not item:
             raise HTTPException(
                 status_code=404, detail="Delivery zone not found")
@@ -204,7 +206,7 @@ def get_delivery_zone(
         500: {"description": "Failed to create delivery zone"}
     }
 )
-def create_delivery_zone(
+async def create_delivery_zone(
     http_request: Request,
     background_tasks: BackgroundTasks,
     restaurant_id: str = Path(..., description="Restaurant UUID"),
@@ -216,7 +218,8 @@ def create_delivery_zone(
     require_restaurant_access(http_request, restaurant_id, x_vapi_secret)
 
     try:
-        item = create_delivery_zone_service(
+        item = await asyncio.to_thread(
+            create_delivery_zone_service,
             restaurant_id=restaurant_id,
             zone_name=request.zone_name,
             description=request.description,
@@ -250,7 +253,7 @@ def create_delivery_zone(
         500: {"description": "Failed to update delivery zone"}
     }
 )
-def update_delivery_zone(
+async def update_delivery_zone(
     http_request: Request,
     background_tasks: BackgroundTasks,
     restaurant_id: str = Path(..., description="Restaurant UUID"),
@@ -263,7 +266,8 @@ def update_delivery_zone(
     require_restaurant_access(http_request, restaurant_id, x_vapi_secret)
 
     try:
-        item = update_delivery_zone_service(
+        item = await asyncio.to_thread(
+            update_delivery_zone_service,
             restaurant_id=restaurant_id,
             zone_id=zone_id,
             zone_name=request.zone_name,
@@ -302,7 +306,7 @@ def update_delivery_zone(
         500: {"description": "Failed to delete delivery zone"}
     }
 )
-def delete_delivery_zone(
+async def delete_delivery_zone(
     http_request: Request,
     background_tasks: BackgroundTasks,
     restaurant_id: str = Path(..., description="Restaurant UUID"),
@@ -314,7 +318,7 @@ def delete_delivery_zone(
     require_restaurant_access(http_request, restaurant_id, x_vapi_secret)
 
     try:
-        deleted = delete_delivery_zone_service(restaurant_id, zone_id)
+        deleted = await asyncio.to_thread(delete_delivery_zone_service, restaurant_id, zone_id)
         if not deleted:
             raise HTTPException(
                 status_code=404, detail="Delivery zone not found")
@@ -346,7 +350,7 @@ def delete_delivery_zone(
         500: {"description": "Failed to set boundary"}
     }
 )
-def set_zone_boundary(
+async def set_zone_boundary(
     http_request: Request,
     restaurant_id: str = Path(..., description="Restaurant UUID"),
     zone_id: str = Path(..., description="Delivery zone UUID"),
@@ -362,7 +366,8 @@ def set_zone_boundary(
             set_zone_boundary as set_boundary_service
         )
 
-        result = set_boundary_service(
+        result = await asyncio.to_thread(
+            set_boundary_service,
             restaurant_id=restaurant_id,
             zone_id=zone_id,
             geojson_boundary=request.boundary
@@ -391,7 +396,7 @@ def set_zone_boundary(
         404: {"description": "Zone not found or boundary not set"}
     }
 )
-def get_zone_boundary_map(
+async def get_zone_boundary_map(
     request: Request,
     restaurant_id: str = Path(..., description="Restaurant UUID"),
     zone_id: str = Path(..., description="Delivery zone UUID"),
@@ -406,7 +411,8 @@ def get_zone_boundary_map(
             get_zone_boundary_geojson
         )
 
-        boundary = get_zone_boundary_geojson(
+        boundary = await asyncio.to_thread(
+            get_zone_boundary_geojson,
             restaurant_id=restaurant_id,
             zone_id=zone_id
         )

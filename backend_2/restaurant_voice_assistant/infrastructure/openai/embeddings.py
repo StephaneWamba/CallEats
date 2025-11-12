@@ -35,6 +35,7 @@ from restaurant_voice_assistant.infrastructure.database.client import (
     get_supabase_client,
     get_supabase_service_client
 )
+from restaurant_voice_assistant.infrastructure.retry import retry_with_backoff
 from typing import Optional
 import logging
 
@@ -43,8 +44,9 @@ openai_client = AsyncOpenAI(api_key=settings.openai_api_key)
 logger = logging.getLogger(__name__)
 
 
+@retry_with_backoff
 async def generate_embedding(text: str) -> list[float]:
-    """Generate embedding for a text using OpenAI."""
+    """Generate embedding for a text using OpenAI with retry logic."""
     response = await openai_client.embeddings.create(
         model=settings.embedding_model,
         input=text

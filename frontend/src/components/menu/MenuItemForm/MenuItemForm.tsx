@@ -2,22 +2,29 @@ import React, { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { X, Trash2, Plus, Tag, Minus } from 'lucide-react';
-import { useAppSelector, useAppDispatch } from '@/store/hooks';
-import { showToast } from '@/store/slices/uiSlice';
+import { X, Trash2 } from 'lucide-react';
+import { useRestaurant } from '@/hooks/useRestaurant';
 import {
-  createMenuItem,
-  updateMenuItem,
-  deleteMenuItem,
+  useCreateMenuItem,
+  useUpdateMenuItem,
+  useDeleteMenuItem,
+} from '@/features/menu/hooks';
+import {
   uploadMenuItemImage,
   deleteMenuItemImage,
   linkModifierToItem,
   unlinkModifierFromItem,
   getMenuItem,
 } from '@/api/menuItems';
+import { useToast } from '@/contexts/ToastContext';
 import { Button } from '../../common/Button';
-import { Input } from '../../common/Input';
-import { ImageUpload } from '../../common/ImageUpload';
+import { getErrorMessage } from '@/utils/errorHandler';
+import {
+  MenuItemFormFields,
+  MenuItemModifiersSection,
+  MenuItemDeleteConfirm,
+  type MenuItemFormData,
+} from './components';
 import type {
   MenuItemResponse,
   CreateMenuItemRequest,
@@ -34,8 +41,6 @@ const menuItemSchema = z.object({
   available: z.boolean().optional(),
 });
 
-type MenuItemFormData = z.infer<typeof menuItemSchema>;
-
 interface MenuItemFormProps {
   item: MenuItemResponse | null;
   categories: CategoryResponse[];
@@ -51,15 +56,16 @@ export const MenuItemForm: React.FC<MenuItemFormProps> = ({
   onClose,
   onSuccess,
 }) => {
-  const dispatch = useAppDispatch();
-  const { restaurant } = useAppSelector((state) => state.restaurant);
+  const { showToast } = useToast();
+  const { data: restaurant } = useRestaurant();
+  const createMenuItemMutation = useCreateMenuItem();
+  const updateMenuItemMutation = useUpdateMenuItem();
+  const deleteMenuItemMutation = useDeleteMenuItem();
   const [error, setError] = useState<string | null>(null);
-  const [isLoading, setIsLoading] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [selectedImage, setSelectedImage] = useState<File | null>(null);
   const [imageToDelete, setImageToDelete] = useState(false);
   const [linkedModifierIds, setLinkedModifierIds] = useState<string[]>([]);
-  const [isLoadingModifiers, setIsLoadingModifiers] = useState(false);
 
   const {
     register,
@@ -81,19 +87,15 @@ export const MenuItemForm: React.FC<MenuItemFormProps> = ({
     const fetchItemModifiers = async () => {
       if (!item || !restaurant) return;
 
-      setIsLoadingModifiers(true);
       try {
         const fullItem = await getMenuItem(restaurant.id, item.id);
         // Extract modifier IDs from the modifiers array
         const modifierIds = fullItem.modifiers?.map(m => m.id) || [];
         setLinkedModifierIds(modifierIds);
-      } catch (err: any) {
+      } catch (_err: any) {
         // If fetching fails, try to use modifiers from the item prop
         const modifierIds = item.modifiers?.map(m => m.id) || [];
         setLinkedModifierIds(modifierIds);
-        console.warn('Failed to fetch item modifiers:', err);
-      } finally {
-        setIsLoadingModifiers(false);
       }
     };
 
@@ -107,7 +109,6 @@ export const MenuItemForm: React.FC<MenuItemFormProps> = ({
     }
 
     setError(null);
-    setIsLoading(true);
 
     try {
       // Ensure price is a number
@@ -115,7 +116,6 @@ export const MenuItemForm: React.FC<MenuItemFormProps> = ({
       
       if (isNaN(price) || price < 0) {
         setError('Please enter a valid price');
-        setIsLoading(false);
         return;
       }
 
@@ -130,7 +130,11 @@ export const MenuItemForm: React.FC<MenuItemFormProps> = ({
           category_id: data.category_id || null,
           available: data.available,
         };
-        savedItem = await updateMenuItem(restaurant.id, item.id, updateData);
+        savedItem = await updateMenuItemMutation.mutateAsync({
+          restaurantId: restaurant.id,
+          itemId: item.id,
+          data: updateData,
+        });
       } else {
         // Create new item
         const createData: CreateMenuItemRequest = {
@@ -140,20 +144,19 @@ export const MenuItemForm: React.FC<MenuItemFormProps> = ({
           category_id: data.category_id || null,
           available: data.available ?? true,
         };
-        savedItem = await createMenuItem(restaurant.id, createData);
+        savedItem = await createMenuItemMutation.mutateAsync({
+          restaurantId: restaurant.id,
+          data: createData,
+        });
       }
 
       // Handle image upload (optional - don't fail if upload fails)
       if (selectedImage && savedItem) {
         try {
           await uploadMenuItemImage(restaurant.id, savedItem.id, selectedImage);
-        } catch (imageError) {
-          // Log error but don't fail the entire operation
-          console.warn('Failed to upload image:', imageError);
-          dispatch(showToast({ 
-            message: 'Menu item saved, but image upload failed. You can upload the image later.', 
-            type: 'warning' 
-          }));
+        } catch (_imageError) {
+          // Don't fail the entire operation if image upload fails
+          showToast('Menu item saved, but image upload failed. You can upload the image later.', 'warning');
         }
       }
 
@@ -164,13 +167,8 @@ export const MenuItemForm: React.FC<MenuItemFormProps> = ({
 
       onSuccess();
     } catch (err: unknown) {
-      if (err instanceof Error) {
-        setError(err.message);
-      } else {
-        setError('Failed to save menu item. Please try again.');
-      }
-    } finally {
-      setIsLoading(false);
+      const errorMessage = getErrorMessage(err, 'Failed to save menu item. Please try again.');
+      setError(errorMessage);
     }
   };
 
@@ -178,20 +176,17 @@ export const MenuItemForm: React.FC<MenuItemFormProps> = ({
     if (!restaurant || !item) return;
 
     setError(null);
-    setIsLoading(true);
 
     try {
-      await deleteMenuItem(restaurant.id, item.id);
+      await deleteMenuItemMutation.mutateAsync({
+        restaurantId: restaurant.id,
+        itemId: item.id,
+      });
+      setShowDeleteConfirm(false);
       onSuccess();
     } catch (err: unknown) {
-      if (err instanceof Error) {
-        setError(err.message);
-      } else {
-        setError('Failed to delete menu item. Please try again.');
-      }
-    } finally {
-      setIsLoading(false);
-      setShowDeleteConfirm(false);
+      const errorMessage = getErrorMessage(err, 'Failed to delete menu item. Please try again.');
+      setError(errorMessage);
     }
   };
 
@@ -215,10 +210,7 @@ export const MenuItemForm: React.FC<MenuItemFormProps> = ({
         // Unlink modifier
         await unlinkModifierFromItem(restaurant.id, item.id, modifierId);
         setLinkedModifierIds(prev => prev.filter(id => id !== modifierId));
-        dispatch(showToast({ 
-          message: 'Modifier removed successfully', 
-          type: 'success' 
-        }));
+        showToast('Modifier removed successfully', 'success');
       } else {
         // Link modifier
         await linkModifierToItem(restaurant.id, item.id, {
@@ -227,18 +219,12 @@ export const MenuItemForm: React.FC<MenuItemFormProps> = ({
           display_order: linkedModifierIds.length,
         });
         setLinkedModifierIds(prev => [...prev, modifierId]);
-        dispatch(showToast({ 
-          message: 'Modifier added successfully', 
-          type: 'success' 
-        }));
+        showToast('Modifier added successfully', 'success');
       }
-    } catch (err: any) {
-      const errorMessage = err?.response?.data?.detail || err?.message || 'Failed to update modifier link';
+    } catch (err: unknown) {
+      const errorMessage = getErrorMessage(err, 'Failed to update modifier link');
       setError(errorMessage);
-      dispatch(showToast({ 
-        message: errorMessage, 
-        type: 'error' 
-      }));
+      showToast(errorMessage, 'error');
     }
   };
 
@@ -279,141 +265,25 @@ export const MenuItemForm: React.FC<MenuItemFormProps> = ({
                 </div>
               )}
 
-              <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
-                {/* Image Upload */}
-                <div className="md:col-span-1">
-                  <label className="mb-2 block text-sm font-medium text-gray-700">
-                    Item Image
-                  </label>
-                  <ImageUpload
-                    currentImageUrl={imageToDelete ? null : item?.image_url}
-                    onImageSelect={handleImageSelect}
-                    onImageDelete={handleImageDelete}
-                    disabled={isLoading}
-                    onError={(message) => dispatch(showToast({ message, type: 'error' }))}
-                  />
-                </div>
+              <MenuItemFormFields
+                register={register}
+                errors={errors}
+                categories={categories}
+                item={item}
+                imageToDelete={imageToDelete}
+                onImageSelect={handleImageSelect}
+                onImageDelete={handleImageDelete}
+                isPending={createMenuItemMutation.isPending || updateMenuItemMutation.isPending}
+                onImageError={(message) => showToast(message, 'error')}
+              />
 
-                {/* Form Fields */}
-                <div className="space-y-4 md:col-span-1">
-                  <Input
-                    label="Item Name"
-                    placeholder="e.g., Margherita Pizza"
-                    error={errors.name?.message}
-                    {...register('name')}
-                  />
-
-                  <Input
-                    label="Price ($)"
-                    type="number"
-                    step="0.01"
-                    placeholder="0.00"
-                    error={errors.price?.message}
-                    {...register('price', { valueAsNumber: true })}
-                  />
-
-                  <div>
-                    <label className="mb-1 block text-sm font-medium text-gray-700">
-                      Category
-                    </label>
-                    <select
-                      className="w-full rounded-lg border border-gray-300 px-3 py-2 text-gray-900 focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
-                      {...register('category_id')}
-                    >
-                      <option value="">No Category</option>
-                      {categories.map((category) => (
-                        <option key={category.id} value={category.id}>
-                          {category.name}
-                        </option>
-                      ))}
-                    </select>
-                    {errors.category_id && (
-                      <p className="mt-1 text-sm text-error">{errors.category_id.message}</p>
-                    )}
-                  </div>
-
-                  <div className="flex items-center gap-2">
-                    <input
-                      type="checkbox"
-                      id="available"
-                      className="h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary"
-                      {...register('available')}
-                    />
-                    <label
-                      htmlFor="available"
-                      className="text-sm font-medium text-gray-700"
-                    >
-                      Available for ordering
-                    </label>
-                  </div>
-                </div>
-
-                {/* Description - Full Width */}
-                <div className="md:col-span-2">
-                  <label className="mb-1 block text-sm font-medium text-gray-700">
-                    Description
-                  </label>
-                  <textarea
-                    className="w-full rounded-lg border border-gray-300 px-3 py-2 text-gray-900 focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
-                    rows={3}
-                    placeholder="Describe the dish, ingredients, etc."
-                    {...register('description')}
-                  />
-                  {errors.description && (
-                    <p className="mt-1 text-sm text-error">{errors.description.message}</p>
-                  )}
-                </div>
-
-                {/* Modifiers - Full Width (only for existing items) */}
-                {item && (
-                  <div className="md:col-span-2">
-                    <label className="mb-2 block text-sm font-medium text-gray-700">
-                      Modifiers
-                    </label>
-                    {modifiers.length === 0 ? (
-                      <p className="text-sm text-gray-500">No modifiers available. Create modifiers first.</p>
-                    ) : (
-                      <div className="rounded-lg border border-gray-200 p-3">
-                        <p className="mb-3 text-xs text-gray-600">
-                          Select which modifiers customers can add to this item
-                        </p>
-                        <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-                          {modifiers.map((modifier) => {
-                            const isLinked = linkedModifierIds.includes(modifier.id);
-                            return (
-                              <button
-                                key={modifier.id}
-                                type="button"
-                                onClick={() => handleToggleModifier(modifier.id)}
-                                className={`flex items-center justify-between rounded-lg border px-3 py-2 text-left text-sm transition-all hover:shadow-sm ${
-                                  isLinked
-                                    ? 'border-primary bg-primary/10 text-primary'
-                                    : 'border-gray-300 bg-white text-gray-700 hover:border-gray-400'
-                                }`}
-                              >
-                                <span className="flex items-center gap-2">
-                                  <Tag className="h-4 w-4" />
-                                  <span className="font-medium">{modifier.name}</span>
-                                  {(typeof modifier.price === 'number' ? modifier.price : parseFloat(modifier.price || '0')) > 0 && (
-                                    <span className="text-xs">
-                                      +${typeof modifier.price === 'number' ? modifier.price.toFixed(2) : parseFloat(modifier.price || '0').toFixed(2)}
-                                    </span>
-                                  )}
-                                </span>
-                                {isLinked ? (
-                                  <Minus className="h-4 w-4" />
-                                ) : (
-                                  <Plus className="h-4 w-4" />
-                                )}
-                              </button>
-                            );
-                          })}
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                )}
-              </div>
+              {item && (
+                <MenuItemModifiersSection
+                  modifiers={modifiers}
+                  linkedModifierIds={linkedModifierIds}
+                  onToggleModifier={handleToggleModifier}
+                />
+              )}
 
               {/* Actions */}
               <div className="mt-6 flex gap-3">
@@ -435,7 +305,7 @@ export const MenuItemForm: React.FC<MenuItemFormProps> = ({
                   variant="outline"
                   size="md"
                   onClick={onClose}
-                  disabled={isLoading}
+                  disabled={createMenuItemMutation.isPending || updateMenuItemMutation.isPending}
                 >
                   Cancel
                 </Button>
@@ -443,7 +313,7 @@ export const MenuItemForm: React.FC<MenuItemFormProps> = ({
                   type="submit"
                   variant="primary"
                   size="md"
-                  isLoading={isLoading}
+                  isLoading={createMenuItemMutation.isPending || updateMenuItemMutation.isPending}
                 >
                   {item ? 'Save Changes' : 'Create Item'}
                 </Button>
@@ -453,46 +323,13 @@ export const MenuItemForm: React.FC<MenuItemFormProps> = ({
         </div>
       </div>
 
-      {/* Delete Confirmation Modal */}
-      {showDeleteConfirm && (
-        <>
-          <div
-            className="fixed inset-0 z-[60] bg-gray-900/50 backdrop-blur-sm"
-            onClick={() => setShowDeleteConfirm(false)}
-          />
-          <div className="fixed inset-0 z-[60] flex items-center justify-center p-4">
-            <div
-              className="w-full max-w-sm rounded-2xl border border-gray-200 bg-white p-6 shadow-xl"
-              onClick={(e) => e.stopPropagation()}
-            >
-              <h3 className="mb-2 text-lg font-bold text-gray-900">Delete Menu Item?</h3>
-              <p className="mb-6 text-sm text-gray-600">
-                This will permanently remove "{item?.name}" from your menu.
-              </p>
-              <div className="flex gap-3">
-                <Button
-                  variant="outline"
-                  size="md"
-                  onClick={() => setShowDeleteConfirm(false)}
-                  disabled={isLoading}
-                  className="flex-1"
-                >
-                  Cancel
-                </Button>
-                <Button
-                  variant="danger"
-                  size="md"
-                  onClick={handleDelete}
-                  isLoading={isLoading}
-                  className="flex-1"
-                >
-                  Delete
-                </Button>
-              </div>
-            </div>
-          </div>
-        </>
-      )}
+      <MenuItemDeleteConfirm
+        item={item}
+        isOpen={showDeleteConfirm}
+        isPending={deleteMenuItemMutation.isPending}
+        onClose={() => setShowDeleteConfirm(false)}
+        onConfirm={handleDelete}
+      />
     </>
   );
 };

@@ -29,7 +29,8 @@ Usage:
         Body: {"email": "...", "password": "..."}
         Returns: {"access_token": "...", "refresh_token": "...", ...}
 """
-from fastapi import APIRouter, HTTPException, Depends
+from fastapi import APIRouter, HTTPException, Depends, Request
+from fastapi.responses import JSONResponse
 from restaurant_voice_assistant.shared.models.auth import (
     RegisterRequest,
     LoginRequest,
@@ -48,6 +49,10 @@ from restaurant_voice_assistant.domain.auth.service import (
     change_password,
     refresh_token,
     register_with_restaurant
+)
+from restaurant_voice_assistant.api.utils.cookies import (
+    get_cookie_config,
+    set_auth_cookies
 )
 import logging
 
@@ -100,21 +105,40 @@ async def register(request: RegisterRequest):
         400: {"description": "Registration failed (email already exists or invalid data)"}
     }
 )
-async def register_with_restaurant_endpoint(request: RegisterWithRestaurantRequest):
+async def register_with_restaurant_endpoint(request_data: RegisterWithRestaurantRequest, request: Request):
     """One-step registration: creates restaurant and user account, then logs in automatically.
 
     Creates restaurant first (with phone assignment), then registers user,
-    then logs in user automatically. Returns user, restaurant, and session data.
+    then logs in user automatically. Sets httpOnly cookies with tokens.
+    Returns user and restaurant data (tokens are in cookies).
     If user registration fails, rolls back by deleting the restaurant.
     """
     try:
         result = register_with_restaurant(
-            email=request.email,
-            password=request.password,
-            restaurant_name=request.restaurant_name
+            email=request_data.email,
+            password=request_data.password,
+            restaurant_name=request_data.restaurant_name
         )
 
-        return RegisterWithRestaurantResponse(**result)
+        # Create response with user and restaurant data
+        response_data = {
+            "user": result["user"],
+            "restaurant": result["restaurant"]
+        }
+        response = JSONResponse(content=response_data)
+
+        # Set httpOnly cookies with tokens
+        cookie_config = get_cookie_config(request)
+        session = result["session"]
+        set_auth_cookies(
+            response=response,
+            access_token=session["access_token"],
+            refresh_token=session["refresh_token"],
+            access_token_max_age=session["expires_in"],
+            cookie_config=cookie_config
+        )
+
+        return response
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
@@ -126,19 +150,39 @@ async def register_with_restaurant_endpoint(request: RegisterWithRestaurantReque
 @router.post(
     "/login",
     summary="Login User",
-    description="Login user and return JWT tokens (access_token and refresh_token).",
+    description="Login user and set httpOnly cookies with JWT tokens.",
     responses={
         200: {"description": "Login successful"},
         401: {"description": "Invalid email or password"}
     }
 )
-async def login(request: LoginRequest):
-    """Login user and return JWT tokens.
+async def login(request_data: LoginRequest, request: Request):
+    """Login user and set httpOnly cookies with tokens.
 
-    Returns access_token and refresh_token for use in Authorization header.
+    Sets access_token and refresh_token as httpOnly cookies for security.
+    Returns user information in response body.
     """
     try:
-        return login_user(email=request.email, password=request.password)
+        result = login_user(email=request_data.email,
+                            password=request_data.password)
+
+        # Create response with user data
+        response = JSONResponse({
+            "user": result["user"],
+            "message": "Login successful"
+        })
+
+        # Set httpOnly cookies with tokens
+        cookie_config = get_cookie_config(request)
+        set_auth_cookies(
+            response=response,
+            access_token=result["access_token"],
+            refresh_token=result["refresh_token"],
+            access_token_max_age=result["expires_in"],
+            cookie_config=cookie_config
+        )
+
+        return response
     except ValueError as e:
         raise HTTPException(status_code=401, detail=str(e))
     except Exception as e:
@@ -212,20 +256,56 @@ async def change_user_password(
 @router.post(
     "/refresh",
     summary="Refresh Token",
-    description="Refresh an expired access token using a refresh token.",
+    description="Refresh an expired access token using refresh token from cookie.",
     responses={
         200: {"description": "Token refreshed successfully"},
         401: {"description": "Invalid or expired refresh token"}
     }
 )
-async def refresh_access_token(request: RefreshTokenRequest):
+async def refresh_access_token(request: Request):
     """Refresh an expired access token.
 
-    Public endpoint - no authentication required (uses refresh_token for auth).
-    Returns new access_token and refresh_token.
+    Public endpoint - no authentication required (uses refresh_token cookie for auth).
+    Reads refresh_token from httpOnly cookie and sets new access_token cookie.
     """
+    # Read refresh token from cookie (preferred) or request body (backward compatibility)
+    refresh_token_str = request.cookies.get("refresh_token")
+
+    # Fallback to request body for backward compatibility during migration
+    if not refresh_token_str:
+        try:
+            body = await request.json()
+            refresh_token_str = body.get("refresh_token")
+        except:
+            pass
+
+    if not refresh_token_str:
+        raise HTTPException(
+            status_code=401,
+            detail="No refresh token provided. Please login again."
+        )
+
     try:
-        return refresh_token(refresh_token_str=request.refresh_token)
+        result = refresh_token(refresh_token_str=refresh_token_str)
+
+        # Create response
+        response = JSONResponse({
+            "message": "Token refreshed successfully"
+        })
+
+        # Set new access_token cookie and update refresh_token if provided
+        cookie_config = get_cookie_config(request)
+        # Use new refresh_token if provided, otherwise keep existing cookie (don't update)
+        refresh_token_value = result.get("refresh_token", "")
+        set_auth_cookies(
+            response=response,
+            access_token=result["access_token"],
+            refresh_token=refresh_token_value,
+            access_token_max_age=result["expires_in"],
+            cookie_config=cookie_config
+        )
+
+        return response
     except ValueError as e:
         raise HTTPException(status_code=401, detail=str(e))
     except Exception as e:
@@ -257,11 +337,17 @@ async def get_current_user_info(user: dict = Depends(get_current_user)):
 @router.post(
     "/logout",
     summary="Logout User",
-    description="Logout user. Client should discard tokens on their side.",
+    description="Logout user and clear authentication cookies.",
     responses={
         200: {"description": "Logout successful"}
     }
 )
 async def logout():
-    """Logout user (client should discard tokens)."""
-    return {"message": "Logged out successfully. Please discard your tokens."}
+    """Logout user and clear httpOnly cookies."""
+    response = JSONResponse({"message": "Logged out successfully"})
+
+    # Clear authentication cookies
+    response.delete_cookie("access_token", path="/")
+    response.delete_cookie("refresh_token", path="/api/auth/refresh")
+
+    return response

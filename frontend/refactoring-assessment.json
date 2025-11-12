@@ -1,0 +1,99 @@
+{
+  "summary": {
+    "totalFiles": 146,
+    "totalLines": 10585,
+    "averageFileSize": 73
+  },
+  "structure": {
+    "features": 16,
+    "shared": 3,
+    "components": 64,
+    "hooks": 3,
+    "api": 10,
+    "contexts": 3,
+    "types": 7,
+    "utils": 4
+  },
+  "featureBreakdown": {
+    "calls": {
+      "files": 3,
+      "lines": 60
+    },
+    "delivery-zones": {
+      "files": 4,
+      "lines": 345
+    },
+    "menu": {
+      "files": 5,
+      "lines": 652
+    },
+    "operating-hours": {
+      "files": 4,
+      "lines": 125
+    }
+  },
+  "largestFiles": [
+    {
+      "path": "pages\\LandingPage\\LandingPage.tsx",
+      "lines": 390
+    },
+    {
+      "path": "utils\\errorHandler.ts",
+      "lines": 368
+    },
+    {
+      "path": "components\\delivery-zones\\DeliveryZoneMap\\DeliveryZoneMap.tsx",
+      "lines": 348
+    },
+    {
+      "path": "components\\menu\\MenuItemForm\\MenuItemForm.tsx",
+      "lines": 337
+    },
+    {
+      "path": "features\\delivery-zones\\hooks\\useDeliveryZoneMutations.ts",
+      "lines": 274
+    },
+    {
+      "path": "components\\menu\\ModifierForm\\ModifierForm.tsx",
+      "lines": 271
+    },
+    {
+      "path": "pages\\DeliveryZones\\DeliveryZones.tsx",
+      "lines": 267
+    },
+    {
+      "path": "components\\menu\\CategoryForm\\CategoryForm.tsx",
+      "lines": 259
+    },
+    {
+      "path": "pages\\MenuBuilder\\MenuBuilder.tsx",
+      "lines": 257
+    },
+    {
+      "path": "pages\\Settings\\Settings.tsx",
+      "lines": 248
+    }
+  ],
+  "importAnalysis": {
+    "featureImports": {
+      "menu": 4,
+      "calls": 2,
+      "operating-hours": 1
+    },
+    "sharedImports": {
+      "components": 3
+    }
+  },
+  "assessment": {
+    "featureBasedStructure": true,
+    "properSeparation": {
+      "features": 16,
+      "shared": 3,
+      "components": 64
+    },
+    "fileSizeHealth": {
+      "largeFiles": 0,
+      "veryLargeFiles": 0
+    }
+  }
+}

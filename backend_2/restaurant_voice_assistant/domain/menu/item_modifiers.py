@@ -30,12 +30,13 @@ Usage:
 """
 from typing import List, Dict, Any, Optional
 from restaurant_voice_assistant.infrastructure.database.client import get_supabase_service_client
-from restaurant_voice_assistant.infrastructure.cache.manager import clear_cache
+from restaurant_voice_assistant.infrastructure.cache.invalidation import invalidate_cache
 import logging
 
 logger = logging.getLogger(__name__)
 
 
+@invalidate_cache(category="menu")  # Modifier links affect menu items
 def link_modifier_to_item(
     restaurant_id: str,
     menu_item_id: str,
@@ -85,7 +86,6 @@ def link_modifier_to_item(
             raise Exception("Failed to create link")
 
         link = resp.data[0]
-        clear_cache(restaurant_id, "menu")
 
         return link
     except Exception as e:
@@ -99,6 +99,7 @@ def link_modifier_to_item(
         raise
 
 
+@invalidate_cache(category="menu")  # Modifier links affect menu items
 def unlink_modifier_from_item(
     restaurant_id: str,
     menu_item_id: str,
@@ -131,7 +132,6 @@ def unlink_modifier_from_item(
             "menu_item_id", menu_item_id).eq("modifier_id", modifier_id).execute()
 
         if resp.data:
-            clear_cache(restaurant_id, "menu")
             return True
         return False
     except Exception as e:

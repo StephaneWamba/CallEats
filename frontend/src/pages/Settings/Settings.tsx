@@ -1,30 +1,24 @@
-import React, { useEffect, useState, useRef } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Settings as SettingsIcon, Building2, Phone, Lock, Save } from 'lucide-react';
-import { useAppSelector, useAppDispatch } from '@/store/hooks';
-import { setRestaurant } from '@/store/slices/restaurantSlice';
-import { showToast } from '@/store/slices/uiSlice';
-import { getMyRestaurant, updateRestaurant } from '@/api/restaurants';
+import { useRestaurant, useUpdateRestaurant } from '@/hooks/useRestaurant';
 import { changePassword } from '@/api/auth';
 import { Layout } from '@/components/layout/Layout';
 import { Button } from '@/components/common/Button';
 import { Input } from '@/components/common/Input';
-import { LoadingSpinner } from '@/components/common/LoadingSpinner';
+import { PageSkeleton } from '@/components/common/Skeleton';
 import { EmptyState } from '@/components/common/EmptyState';
-import type { UpdateRestaurantRequest } from '@/types/restaurant';
+import { getErrorMessage } from '@/utils/errorHandler';
 import type { ChangePasswordRequest } from '@/types/auth';
 
 export const Settings: React.FC = () => {
-  const dispatch = useAppDispatch();
-  const { restaurant } = useAppSelector((state) => state.restaurant);
-  const [isLoading, setIsLoading] = useState(false);
-  const [isSavingRestaurant, setIsSavingRestaurant] = useState(false);
+  const { data: restaurant, isLoading } = useRestaurant();
+  const updateRestaurantMutation = useUpdateRestaurant();
   const [isChangingPassword, setIsChangingPassword] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
 
   // Restaurant form state
   const [restaurantName, setRestaurantName] = useState('');
-  const lastSyncedRestaurantId = useRef<string | null>(null);
 
   // Password form state
   const [passwordData, setPasswordData] = useState({
@@ -33,60 +27,31 @@ export const Settings: React.FC = () => {
     confirm_password: '',
   });
 
-  // Fetch restaurant data and sync name
+  // Sync restaurant name when data loads
   useEffect(() => {
-    const restaurantId = restaurant?.id;
-    
-    const fetchRestaurant = async () => {
-      if (!restaurantId) {
-        if (lastSyncedRestaurantId.current === null) {
-          setIsLoading(true);
-          try {
-            const data = await getMyRestaurant();
-            dispatch(setRestaurant(data));
-            setRestaurantName(data.name);
-            lastSyncedRestaurantId.current = data.id;
-          } catch (err) {
-            setError('Failed to load restaurant settings');
-          } finally {
-            setIsLoading(false);
-          }
-        }
-      } else if (restaurantId !== lastSyncedRestaurantId.current && restaurant) {
-        // Restaurant changed (e.g., from another component), sync the name
-        setRestaurantName(restaurant.name);
-        lastSyncedRestaurantId.current = restaurantId;
-      }
-    };
-
-    fetchRestaurant();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [restaurant?.id]);
+    if (restaurant) {
+      setRestaurantName(restaurant.name);
+    }
+  }, [restaurant]);
 
   const handleUpdateRestaurant = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!restaurant) return;
 
-    setIsSavingRestaurant(true);
     setError(null);
     setSuccess(null);
 
     try {
-      const updateData: UpdateRestaurantRequest = {
-        name: restaurantName,
-      };
-      const updated = await updateRestaurant(restaurant.id, updateData);
-      dispatch(setRestaurant(updated));
+      await updateRestaurantMutation.mutateAsync({
+        restaurantId: restaurant.id,
+        data: { name: restaurantName },
+      });
       const successMessage = 'Restaurant name updated successfully!';
       setSuccess(successMessage);
-      dispatch(showToast({ message: successMessage, type: 'success' }));
       setTimeout(() => setSuccess(null), 3000);
-    } catch (err: any) {
-      const errorMessage = err?.response?.data?.detail || 'Failed to update restaurant name';
+    } catch (err: unknown) {
+      const errorMessage = getErrorMessage(err, 'Failed to update restaurant name');
       setError(errorMessage);
-      dispatch(showToast({ message: errorMessage, type: 'error' }));
-    } finally {
-      setIsSavingRestaurant(false);
     }
   };
 
@@ -115,17 +80,15 @@ export const Settings: React.FC = () => {
       await changePassword(changePasswordData);
       const successMessage = 'Password changed successfully!';
       setSuccess(successMessage);
-      dispatch(showToast({ message: successMessage, type: 'success' }));
       setPasswordData({
         current_password: '',
         new_password: '',
         confirm_password: '',
       });
       setTimeout(() => setSuccess(null), 3000);
-    } catch (err: any) {
-      const errorMessage = err?.response?.data?.detail || 'Failed to change password';
+    } catch (err: unknown) {
+      const errorMessage = getErrorMessage(err, 'Failed to change password');
       setError(errorMessage);
-      dispatch(showToast({ message: errorMessage, type: 'error' }));
     } finally {
       setIsChangingPassword(false);
     }
@@ -134,9 +97,7 @@ export const Settings: React.FC = () => {
   if (isLoading) {
     return (
       <Layout>
-        <div className="flex min-h-[400px] items-center justify-center">
-          <LoadingSpinner size="lg" />
-        </div>
+        <PageSkeleton />
       </Layout>
     );
   }
@@ -196,7 +157,7 @@ export const Settings: React.FC = () => {
                   className="flex-1"
                   required
                 />
-                <Button type="submit" variant="primary" isLoading={isSavingRestaurant}>
+                <Button type="submit" variant="primary" isLoading={updateRestaurantMutation.isPending}>
                   <Save className="mr-2 h-4 w-4" />
                   Save
                 </Button>

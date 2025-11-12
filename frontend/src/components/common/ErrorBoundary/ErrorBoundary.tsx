@@ -1,5 +1,6 @@
 import { Component } from 'react';
 import type { ErrorInfo, ReactNode } from 'react';
+import * as Sentry from '@sentry/react';
 import { Button } from '../Button';
 
 interface Props {
@@ -22,7 +23,24 @@ export class ErrorBoundary extends Component<Props, State> {
   }
 
   public componentDidCatch(error: Error, errorInfo: ErrorInfo) {
-    // Error logged to error state for user display
+    // Log error to Sentry with React component stack (only if Sentry is initialized)
+    try {
+      Sentry.captureException(error, {
+        contexts: {
+          react: {
+            componentStack: errorInfo.componentStack,
+          },
+        },
+        tags: {
+          errorBoundary: true,
+        },
+        extra: {
+          errorInfo,
+        },
+      });
+    } catch (_sentryError) {
+      // Sentry not initialized, ignore
+    }
   }
 
   private handleReset = () => {

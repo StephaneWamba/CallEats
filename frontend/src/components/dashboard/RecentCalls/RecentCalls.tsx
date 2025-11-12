@@ -1,11 +1,10 @@
-import React, { useEffect, useState, useRef } from 'react';
+import React from 'react';
 import { Link } from 'react-router-dom';
 import { Phone, ArrowRight, Clock } from 'lucide-react';
 import { ROUTES } from '../../../config/routes';
 import { EmptyState } from '../../common/EmptyState';
-import { useAppSelector } from '../../../store/hooks';
-import { listCalls } from '../../../api/calls';
-import type { CallResponse } from '../../../types/calls';
+import { useRestaurant } from '../../../hooks/useRestaurant';
+import { useCalls } from '@/features/calls/hooks';
 
 const formatDate = (dateString: string): string => {
   const date = new Date(dateString);
@@ -25,36 +24,8 @@ const formatDuration = (seconds: number | null): string => {
 };
 
 export const RecentCalls: React.FC = () => {
-  const { restaurant } = useAppSelector((state) => state.restaurant);
-  const [calls, setCalls] = useState<CallResponse[]>([]);
-  const [isLoading, setIsLoading] = useState(false);
-  const lastFetchedRestaurantId = useRef<string | null>(null);
-
-  useEffect(() => {
-    const restaurantId = restaurant?.id;
-    
-    // Only fetch if restaurant ID changed
-    if (!restaurantId || restaurantId === lastFetchedRestaurantId.current) {
-      return;
-    }
-
-    lastFetchedRestaurantId.current = restaurantId;
-
-    const fetchCalls = async () => {
-      setIsLoading(true);
-      try {
-        const data = await listCalls(restaurantId, 5); // Get last 5 calls
-        setCalls(data);
-      } catch (err) {
-        // Error handled silently
-      } finally {
-        setIsLoading(false);
-      }
-    };
-
-    fetchCalls();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [restaurant?.id]);
+  const { data: restaurant } = useRestaurant();
+  const { data: calls, isLoading } = useCalls(restaurant?.id, 5);
 
   return (
     <div className="rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
@@ -73,7 +44,7 @@ export const RecentCalls: React.FC = () => {
         <div className="flex min-h-[100px] items-center justify-center">
           <div className="h-6 w-6 animate-spin rounded-full border-2 border-primary border-t-transparent" />
         </div>
-      ) : calls.length === 0 ? (
+      ) : !calls || calls.length === 0 ? (
         <EmptyState
           icon={Phone}
           title="No calls yet"
@@ -81,7 +52,7 @@ export const RecentCalls: React.FC = () => {
         />
       ) : (
         <div className="space-y-3">
-          {calls.map((call) => (
+          {(calls || []).map((call) => (
             <Link
               key={call.id}
               to={ROUTES.CALL_HISTORY}

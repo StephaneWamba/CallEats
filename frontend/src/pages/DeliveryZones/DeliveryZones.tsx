@@ -10,7 +10,7 @@ import {
 } from '@/features/delivery-zones/hooks';
 import { Layout } from '@/components/layout/Layout';
 import { Button } from '@/components/common/Button';
-import { LoadingSpinner } from '@/components/common/LoadingSpinner';
+import { ZoneCardSkeleton } from '@/components/common/Skeleton';
 import { EmptyState } from '@/components/common/EmptyState';
 import { LazyDeliveryZoneMap } from '@/components/delivery-zones/DeliveryZoneMap/LazyDeliveryZoneMap';
 import type {
@@ -23,7 +23,7 @@ import { ZoneForm } from './components/ZoneForm';
 import { DeleteZoneModal } from './components/DeleteZoneModal';
 
 export const DeliveryZones: React.FC = () => {
-  const { data: restaurant } = useRestaurant();
+  const { data: restaurant, isLoading: isLoadingRestaurant } = useRestaurant();
   const { data: zones, isLoading } = useDeliveryZones(restaurant?.id);
   const zonesArray = zones || [];
   const createZoneMutation = useCreateDeliveryZone();
@@ -158,6 +158,24 @@ export const DeliveryZones: React.FC = () => {
     setShowMap(true);
   };
 
+  if (isLoadingRestaurant) {
+    return (
+      <Layout>
+        <div className="space-y-6">
+          <div className="space-y-2">
+            <div className="h-8 w-64 animate-pulse rounded bg-gray-200" />
+            <div className="h-4 w-96 animate-pulse rounded bg-gray-200" />
+          </div>
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            {[1, 2, 3].map((i) => (
+              <ZoneCardSkeleton key={i} />
+            ))}
+          </div>
+        </div>
+      </Layout>
+    );
+  }
+
   if (!restaurant) {
     return (
       <Layout>
@@ -201,7 +219,7 @@ export const DeliveryZones: React.FC = () => {
 
         {/* Map Section */}
         {showMap && restaurant && (
-          <div className="rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
+          <div className={`rounded-xl border border-gray-200 bg-white p-6 shadow-sm relative ${isFormOpen ? 'blur-sm pointer-events-none' : ''}`}>
             <LazyDeliveryZoneMap
               zones={zonesArray}
               selectedZone={selectedZone}
@@ -215,8 +233,10 @@ export const DeliveryZones: React.FC = () => {
 
         {/* Zones List */}
         {isLoading && zonesArray.length === 0 ? (
-          <div className="flex min-h-[400px] items-center justify-center">
-            <LoadingSpinner size="lg" />
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            {[1, 2, 3].map((i) => (
+              <ZoneCardSkeleton key={i} />
+            ))}
           </div>
         ) : zonesArray.length === 0 ? (
           <EmptyState

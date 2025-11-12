@@ -8,6 +8,7 @@ import { Button } from '@/components/common/Button';
 import { Input } from '@/components/common/Input';
 import { Logo } from '@/components/common/Logo';
 import { ROUTES } from '@/config/routes';
+import { getErrorMessage } from '@/utils/errorHandler';
 import type { RegisterWithRestaurantRequest } from '@/types/auth';
 
 const signUpSchema = z.object({
@@ -39,42 +40,7 @@ export const SignUpPage = () => {
       await registerWithRestaurant(data);
       navigate(ROUTES.DASHBOARD);
     } catch (err: unknown) {
-      let errorMessage = 'Registration failed. Please try again.';
-      
-      if (err && typeof err === 'object' && 'response' in err) {
-        const axiosError = err as { 
-          response?: { 
-            data?: { 
-              detail?: string | string[]; 
-              message?: string;
-              error?: string;
-            };
-            status?: number;
-          };
-        };
-        
-        const responseData = axiosError.response?.data;
-        
-        if (responseData) {
-          // Handle FastAPI validation errors (detail can be string or array)
-          if (responseData.detail) {
-            if (Array.isArray(responseData.detail)) {
-              errorMessage = responseData.detail.map((d: any) => 
-                d.msg || d.message || String(d)
-              ).join(', ');
-            } else {
-              errorMessage = String(responseData.detail);
-            }
-          } else if (responseData.message) {
-            errorMessage = responseData.message;
-          } else if (responseData.error) {
-            errorMessage = responseData.error;
-          }
-        }
-      } else if (err instanceof Error) {
-        errorMessage = err.message;
-      }
-      
+      const errorMessage = getErrorMessage(err, 'Registration failed. Please try again.');
       setError(errorMessage);
     } finally {
       setIsLoading(false);

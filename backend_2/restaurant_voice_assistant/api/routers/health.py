@@ -15,12 +15,13 @@ Usage:
     The health endpoint is public (no authentication required) and can be
     used by monitoring systems, load balancers, and deployment pipelines.
 """
-from fastapi import APIRouter
+from fastapi import APIRouter, Request
 from restaurant_voice_assistant.infrastructure.health.service import (
     check_supabase,
     check_openai,
     check_vapi
 )
+from restaurant_voice_assistant.api.middleware.rate_limit import limiter
 
 router = APIRouter()
 
@@ -47,7 +48,8 @@ router = APIRouter()
         }
     }
 )
-async def health_check():
+@limiter.limit("60/minute")  # Higher limit for health checks
+async def health_check(request):
     """Get overall health status and external service connectivity."""
     results = {
         "status": "healthy",

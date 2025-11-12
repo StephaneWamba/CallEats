@@ -8,8 +8,6 @@ import type {
   RegisterWithRestaurantResponse,
   ResetPasswordRequest,
   ChangePasswordRequest,
-  RefreshTokenRequest,
-  RefreshTokenResponse,
   UserResponse,
 } from '@/types/auth';
 
@@ -81,13 +79,12 @@ export const changePassword = async (
 
 /**
  * Refresh expired access token
+ * Note: Refresh token is read from httpOnly cookie by backend
  */
-export const refreshToken = async (
-  data: RefreshTokenRequest
-): Promise<RefreshTokenResponse> => {
-  const response = await apiClient.post<RefreshTokenResponse>(
+export const refreshToken = async (): Promise<{ message: string }> => {
+  const response = await apiClient.post<{ message: string }>(
     API_ENDPOINTS.AUTH.REFRESH_TOKEN,
-    data
+    {}  // Empty body - refresh token comes from cookie
   );
   return response.data;
 };
@@ -101,16 +98,12 @@ export const getCurrentUser = async (): Promise<UserResponse> => {
 };
 
 /**
- * Logout (client-side: discard tokens)
- * Note: Backend doesn't invalidate tokens, client just removes them
+ * Logout - clears httpOnly cookies on backend
  */
-export const logout = async (): Promise<void> => {
-  // Backend logout endpoint exists but doesn't invalidate tokens
-  // Client-side logout is handled by removing tokens from localStorage
-  try {
-    await apiClient.post(API_ENDPOINTS.AUTH.LOGOUT);
-  } catch (error) {
-    // Ignore errors - logout is primarily client-side
-  }
+export const logout = async (): Promise<{ message: string }> => {
+  const response = await apiClient.post<{ message: string }>(
+    API_ENDPOINTS.AUTH.LOGOUT
+  );
+  return response.data;
 };
 

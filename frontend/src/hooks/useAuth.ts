@@ -1,15 +1,12 @@
 import { useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useAppDispatch, useAppSelector } from '@/store/hooks';
-import { setCredentials, logout as logoutAction, updateTokens } from '@/store/slices/authSlice';
+import { useAuth as useAuthContext } from '@/contexts/AuthContext';
 import {
   login as loginAPI,
   registerWithRestaurant as registerWithRestaurantAPI,
   resetPassword as resetPasswordAPI,
   changePassword as changePasswordAPI,
-  refreshToken as refreshTokenAPI,
   getCurrentUser as getCurrentUserAPI,
-  logout as logoutAPI,
 } from '@/api/auth';
 import type {
   LoginRequest,
@@ -19,12 +16,13 @@ import type {
 } from '@/types/auth';
 import { ROUTES } from '@/config/routes';
 
+/**
+ * Enhanced auth hook that provides authentication actions
+ * Uses AuthContext for state management
+ */
 export const useAuth = () => {
-  const dispatch = useAppDispatch();
   const navigate = useNavigate();
-  const { user, accessToken, refreshToken: refreshTokenValue, isAuthenticated } = useAppSelector(
-    (state) => state.auth
-  );
+  const { user, isAuthenticated, login: loginContext, logout: logoutContext, refreshUser } = useAuthContext();
 
   /**
    * Login user
@@ -32,33 +30,23 @@ export const useAuth = () => {
   const login = useCallback(
     async (credentials: LoginRequest) => {
       try {
-        // Step 1: Login and get tokens
+        // Login - backend sets httpOnly cookies automatically
         const response = await loginAPI(credentials);
         
-        // Step 2: Store tokens temporarily in localStorage for the next API call
-        localStorage.setItem('access_token', response.access_token);
-        localStorage.setItem('refresh_token', response.refresh_token);
-        
-        // Step 3: Fetch full user info (includes restaurant_id and role)
+        // Fetch full user info (includes restaurant_id and role)
+        // Cookies are sent automatically with the request
         const fullUserInfo = await getCurrentUserAPI();
         
-        // Step 4: Update Redux store with full user info and tokens
-        dispatch(
-          setCredentials({
-            user: fullUserInfo,
-            accessToken: response.access_token,
-            refreshToken: response.refresh_token,
-          })
-        );
+        // Update auth context with user info
+        loginContext(fullUserInfo);
+        
         return response;
       } catch (error) {
-        // Clean up tokens if login or user fetch fails
-        localStorage.removeItem('access_token');
-        localStorage.removeItem('refresh_token');
+        // Cookies are managed by backend - no cleanup needed
         throw error;
       }
     },
-    [dispatch]
+    [loginContext]
   );
 
   /**
@@ -67,25 +55,25 @@ export const useAuth = () => {
   const registerWithRestaurant = useCallback(
     async (data: RegisterWithRestaurantRequest) => {
       try {
+        // Register - backend sets httpOnly cookies automatically
         const response = await registerWithRestaurantAPI(data);
-        dispatch(
-          setCredentials({
-            user: {
-              user_id: response.user.user_id,
-              email: response.user.email,
-              restaurant_id: response.restaurant.id,
-              role: 'user',
-            },
-            accessToken: response.session.access_token,
-            refreshToken: response.session.refresh_token,
-          })
-        );
+        
+        // Update auth context with user info
+        const userData = {
+          user_id: response.user.user_id,
+          email: response.user.email,
+          restaurant_id: response.restaurant.id,
+          role: 'user' as const,
+        };
+        
+        loginContext(userData);
+        
         return response;
       } catch (error) {
         throw error;
       }
     },
-    [dispatch]
+    [loginContext]
   );
 
   /**
@@ -111,68 +99,36 @@ export const useAuth = () => {
   }, []);
 
   /**
-   * Refresh access token
-   */
-  const refreshAccessToken = useCallback(async () => {
-    if (!refreshTokenValue) {
-      throw new Error('No refresh token available');
-    }
-
-    try {
-      const response = await refreshTokenAPI({ refresh_token: refreshTokenValue });
-      dispatch(
-        updateTokens({
-          accessToken: response.access_token,
-          refreshToken: response.refresh_token,
-        })
-      );
-      return response;
-    } catch (error) {
-      // Refresh failed - logout user
-      dispatch(logoutAction());
-      navigate(ROUTES.LOGIN);
-      throw error;
-    }
-  }, [dispatch, navigate, refreshTokenValue]);
-
-  /**
    * Get current user info
    */
   const getCurrentUser = useCallback(async () => {
     try {
       const userData = await getCurrentUserAPI();
-      // Update user in store if needed
+      // Refresh user in context
+      await refreshUser();
       return userData;
     } catch (error) {
       throw error;
     }
-  }, []);
+  }, [refreshUser]);
 
   /**
    * Logout user
    */
   const logout = useCallback(async () => {
-    try {
-      await logoutAPI();
-    } catch (error) {
-      // Ignore API errors - logout is primarily client-side
-    } finally {
-      dispatch(logoutAction());
-      navigate(ROUTES.LANDING);
-    }
-  }, [dispatch, navigate]);
+    await logoutContext();
+    navigate(ROUTES.LANDING);
+  }, [logoutContext, navigate]);
 
   return {
     // State
     user,
-    accessToken,
     isAuthenticated,
     // Actions
     login,
     registerWithRestaurant,
     resetPassword,
     changePassword,
-    refreshAccessToken,
     getCurrentUser,
     logout,
   };

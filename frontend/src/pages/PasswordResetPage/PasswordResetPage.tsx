@@ -8,6 +8,7 @@ import { Button } from '@/components/common/Button';
 import { Input } from '@/components/common/Input';
 import { Logo } from '@/components/common/Logo';
 import { ROUTES } from '@/config/routes';
+import { getErrorMessage } from '@/utils/errorHandler';
 import type { ResetPasswordRequest } from '@/types/auth';
 
 const resetPasswordSchema = z.object({
@@ -37,11 +38,8 @@ export const PasswordResetPage = () => {
       await resetPassword(data);
       setSuccess(true);
     } catch (err: unknown) {
-      if (err instanceof Error) {
-        setError(err.message);
-      } else {
-        setError('Failed to send reset email. Please try again.');
-      }
+      const errorMessage = getErrorMessage(err, 'Failed to send reset email. Please try again.');
+      setError(errorMessage);
     } finally {
       setIsLoading(false);
     }
@@ -114,7 +112,6 @@ export const PasswordResetPage = () => {
             <Input
               label="Email Address"
               type="email"
-              name="email"
               placeholder="user@restaurant.com"
               error={errors.email?.message}
               {...register('email')}

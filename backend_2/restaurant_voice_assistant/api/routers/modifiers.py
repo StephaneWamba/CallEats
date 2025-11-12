@@ -47,6 +47,7 @@ from restaurant_voice_assistant.infrastructure.openai.embeddings import (
     add_embedding_task
 )
 from restaurant_voice_assistant.api.middleware.request_id import get_request_id
+import asyncio
 import logging
 
 router = APIRouter()
@@ -65,7 +66,7 @@ logger = logging.getLogger(__name__)
         500: {"description": "Failed to fetch modifiers"}
     }
 )
-def list_modifiers(
+async def list_modifiers(
     request: Request,
     restaurant_id: str = Path(..., description="Restaurant UUID"),
     x_vapi_secret: Optional[str] = Header(
@@ -75,7 +76,7 @@ def list_modifiers(
     require_restaurant_access(request, restaurant_id, x_vapi_secret)
 
     try:
-        items = list_modifiers_service(restaurant_id)
+        items = await asyncio.to_thread(list_modifiers_service, restaurant_id)
         return items
     except Exception as e:
         logger.error(
@@ -98,7 +99,7 @@ def list_modifiers(
         500: {"description": "Failed to fetch modifier"}
     }
 )
-def get_modifier(
+async def get_modifier(
     request: Request,
     restaurant_id: str = Path(..., description="Restaurant UUID"),
     modifier_id: str = Path(..., description="Modifier UUID"),
@@ -109,7 +110,7 @@ def get_modifier(
     require_restaurant_access(request, restaurant_id, x_vapi_secret)
 
     try:
-        item = get_modifier_service(restaurant_id, modifier_id)
+        item = await asyncio.to_thread(get_modifier_service, restaurant_id, modifier_id)
         if not item:
             raise HTTPException(
                 status_code=404, detail="Modifier not found")
@@ -137,7 +138,7 @@ def get_modifier(
         500: {"description": "Failed to create modifier"}
     }
 )
-def create_modifier(
+async def create_modifier(
     http_request: Request,
     background_tasks: BackgroundTasks,
     restaurant_id: str = Path(..., description="Restaurant UUID"),
@@ -149,7 +150,8 @@ def create_modifier(
     require_restaurant_access(http_request, restaurant_id, x_vapi_secret)
 
     try:
-        item = create_modifier_service(
+        item = await asyncio.to_thread(
+            create_modifier_service,
             restaurant_id=restaurant_id,
             name=request.name,
             description=request.description,
@@ -182,7 +184,7 @@ def create_modifier(
         500: {"description": "Failed to update modifier"}
     }
 )
-def update_modifier(
+async def update_modifier(
     http_request: Request,
     background_tasks: BackgroundTasks,
     restaurant_id: str = Path(..., description="Restaurant UUID"),
@@ -195,7 +197,8 @@ def update_modifier(
     require_restaurant_access(http_request, restaurant_id, x_vapi_secret)
 
     try:
-        item = update_modifier_service(
+        item = await asyncio.to_thread(
+            update_modifier_service,
             restaurant_id=restaurant_id,
             modifier_id=modifier_id,
             name=request.name,
@@ -233,7 +236,7 @@ def update_modifier(
         500: {"description": "Failed to delete modifier"}
     }
 )
-def delete_modifier(
+async def delete_modifier(
     http_request: Request,
     background_tasks: BackgroundTasks,
     restaurant_id: str = Path(..., description="Restaurant UUID"),
@@ -245,7 +248,7 @@ def delete_modifier(
     require_restaurant_access(http_request, restaurant_id, x_vapi_secret)
 
     try:
-        deleted = delete_modifier_service(restaurant_id, modifier_id)
+        deleted = await asyncio.to_thread(delete_modifier_service, restaurant_id, modifier_id)
         if not deleted:
             raise HTTPException(
                 status_code=404, detail="Modifier not found")

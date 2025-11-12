@@ -45,8 +45,7 @@ export const geocodeAddress = async (address: string): Promise<GeocodeResult | n
     }
 
     return null;
-  } catch (error) {
-    console.error('Geocoding error:', error);
+  } catch (_error) {
     return null;
   }
 };
@@ -80,8 +79,7 @@ export const reverseGeocode = async (lat: number, lng: number): Promise<GeocodeR
     }
 
     return null;
-  } catch (error) {
-    console.error('Reverse geocoding error:', error);
+  } catch (_error) {
     return null;
   }
 };

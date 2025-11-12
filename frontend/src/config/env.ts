@@ -1,5 +1,54 @@
+/**
+ * Environment variable validation
+ * Validates required environment variables and provides helpful error messages
+ */
+function validateEnv() {
+  const errors: string[] = [];
+  const warnings: string[] = [];
+
+  // API_BASE_URL is required in production
+  if (import.meta.env.PROD && !import.meta.env.VITE_API_BASE_URL) {
+    errors.push('VITE_API_BASE_URL is required in production');
+  }
+
+  // Warn if Sentry DSN is missing (in any environment)
+  if (!import.meta.env.VITE_SENTRY_DSN) {
+    warnings.push('VITE_SENTRY_DSN is not set - error tracking will be disabled');
+  }
+
+  if (errors.length > 0) {
+    throw new Error(
+      `Environment validation failed:\n${errors.join('\n')}\n\n` +
+      'Please check your .env file and ensure all required variables are set.'
+    );
+  }
+
+  // Show warnings in the environment where they're detected
+  if (warnings.length > 0) {
+    console.warn('Environment warnings:', warnings.join(', '));
+  }
+}
+
+// Validate environment variables on module load
+try {
+  validateEnv();
+} catch (error) {
+  // In development, log the error but don't block
+  if (import.meta.env.DEV) {
+    console.error(error);
+  } else {
+    // In production, throw to prevent app from starting with invalid config
+    throw error;
+  }
+}
+
 // API Configuration
 export const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000';
+
+// Sentry Configuration
+export const SENTRY_DSN = import.meta.env.VITE_SENTRY_DSN;
+export const SENTRY_ENVIRONMENT = import.meta.env.VITE_SENTRY_ENVIRONMENT || import.meta.env.MODE || 'development';
+export const SENTRY_ENABLED = import.meta.env.VITE_SENTRY_ENABLED !== 'false'; // Enabled by default unless explicitly disabled
 
 // API Endpoints
 export const API_ENDPOINTS = {

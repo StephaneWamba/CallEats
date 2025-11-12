@@ -3,11 +3,14 @@ import { Link } from 'react-router-dom';
 import { UtensilsCrossed, ArrowRight } from 'lucide-react';
 import { ROUTES } from '../../../config/routes';
 import { EmptyState } from '../../common/EmptyState';
-import { useAppSelector } from '@/store/hooks';
+import { LazyImage } from '@/shared/components/LazyImage';
+import { useRestaurant } from '@/hooks/useRestaurant';
+import { useMenuItems } from '@/features/menu/hooks';
 
 export const MenuPreview: React.FC = () => {
-  const { menuItems } = useAppSelector((state) => state.menu);
-  const previewItems = menuItems.slice(0, 5); // Show first 5 items
+  const { data: restaurant } = useRestaurant();
+  const { data: menuItems } = useMenuItems(restaurant?.id);
+  const previewItems = (menuItems || []).slice(0, 5); // Show first 5 items
 
   return (
     <div className="rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
@@ -22,7 +25,7 @@ export const MenuPreview: React.FC = () => {
         </Link>
       </div>
 
-      {menuItems.length === 0 ? (
+      {!menuItems || menuItems.length === 0 ? (
         <EmptyState
           icon={UtensilsCrossed}
           title="No menu items yet"
@@ -37,10 +40,13 @@ export const MenuPreview: React.FC = () => {
             >
               <div className="flex items-center gap-3">
                 {item.image_url ? (
-                  <img
+                  <LazyImage
                     src={item.image_url}
                     alt={item.name}
                     className="h-12 w-12 rounded-lg object-cover"
+                    enableWebP={true}
+                    srcsetSizes={['48w', '96w', '144w']}
+                    sizes="48px"
                   />
                 ) : (
                   <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-gray-200">
@@ -64,7 +70,7 @@ export const MenuPreview: React.FC = () => {
               </div>
             </div>
           ))}
-          {menuItems.length > 5 && (
+          {menuItems && menuItems.length > 5 && (
             <Link
               to={ROUTES.MENU_BUILDER}
               className="block text-center text-sm font-medium text-primary hover:text-primary/80"

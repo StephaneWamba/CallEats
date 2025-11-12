@@ -50,6 +50,8 @@ from restaurant_voice_assistant.infrastructure.database.client import (
     get_supabase_client,
     get_supabase_service_client
 )
+from restaurant_voice_assistant.infrastructure.database.transactions import transaction
+from restaurant_voice_assistant.core.exceptions import RestaurantVoiceAssistantError
 from restaurant_voice_assistant.core.config import get_settings
 from restaurant_voice_assistant.domain.restaurants.service import create_restaurant
 import logging

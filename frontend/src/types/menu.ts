@@ -6,7 +6,6 @@ export interface MenuItemResponse {
   description: string | null;
   price: number; // Decimal from backend, converted to number
   category_id: string | null;
-  category: string | null; // Legacy field
   available: boolean;
   image_url: string | null;
   modifiers?: ModifierResponse[]; // Linked modifiers (returned by GET endpoint)

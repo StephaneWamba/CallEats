@@ -3,10 +3,11 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { X, Trash2 } from 'lucide-react';
-import { useAppSelector } from '@/store/hooks';
-import { createModifier, updateModifier, deleteModifier } from '@/api/modifiers';
+import { useRestaurant } from '@/hooks/useRestaurant';
+import { useCreateModifier, useUpdateModifier, useDeleteModifier } from '@/features/menu/hooks';
 import { Button } from '../../common/Button';
 import { Input } from '../../common/Input';
+import { getErrorMessage } from '@/utils/errorHandler';
 import type { ModifierResponse, CreateModifierRequest, UpdateModifierRequest } from '@/types/menu';
 
 const modifierSchema = z.object({
@@ -28,9 +29,11 @@ export const ModifierForm: React.FC<ModifierFormProps> = ({
   onClose,
   onSuccess,
 }) => {
-  const { restaurant } = useAppSelector((state) => state.restaurant);
+  const { data: restaurant } = useRestaurant();
+  const createModifierMutation = useCreateModifier();
+  const updateModifierMutation = useUpdateModifier();
+  const deleteModifierMutation = useDeleteModifier();
   const [error, setError] = useState<string | null>(null);
-  const [isLoading, setIsLoading] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
 
   const {
@@ -64,7 +67,6 @@ export const ModifierForm: React.FC<ModifierFormProps> = ({
     }
 
     setError(null);
-    setIsLoading(true);
 
     try {
       if (modifier) {
@@ -74,7 +76,11 @@ export const ModifierForm: React.FC<ModifierFormProps> = ({
           description: data.description || null,
           price: data.price,
         };
-        await updateModifier(restaurant.id, modifier.id, updateData);
+        await updateModifierMutation.mutateAsync({
+          restaurantId: restaurant.id,
+          modifierId: modifier.id,
+          data: updateData,
+        });
       } else {
         // Create new modifier
         const createData: CreateModifierRequest = {
@@ -82,17 +88,15 @@ export const ModifierForm: React.FC<ModifierFormProps> = ({
           description: data.description || null,
           price: data.price,
         };
-        await createModifier(restaurant.id, createData);
+        await createModifierMutation.mutateAsync({
+          restaurantId: restaurant.id,
+          data: createData,
+        });
       }
       onSuccess();
     } catch (err: unknown) {
-      if (err instanceof Error) {
-        setError(err.message);
-      } else {
-        setError('Failed to save modifier. Please try again.');
-      }
-    } finally {
-      setIsLoading(false);
+      const errorMessage = getErrorMessage(err, 'Failed to save modifier. Please try again.');
+      setError(errorMessage);
     }
   };
 
@@ -100,20 +104,17 @@ export const ModifierForm: React.FC<ModifierFormProps> = ({
     if (!restaurant || !modifier) return;
 
     setError(null);
-    setIsLoading(true);
 
     try {
-      await deleteModifier(restaurant.id, modifier.id);
+      await deleteModifierMutation.mutateAsync({
+        restaurantId: restaurant.id,
+        modifierId: modifier.id,
+      });
+      setShowDeleteConfirm(false);
       onSuccess();
     } catch (err: unknown) {
-      if (err instanceof Error) {
-        setError(err.message);
-      } else {
-        setError('Failed to delete modifier. Please try again.');
-      }
-    } finally {
-      setIsLoading(false);
-      setShowDeleteConfirm(false);
+      const errorMessage = getErrorMessage(err, 'Failed to delete modifier. Please try again.');
+      setError(errorMessage);
     }
   };
 
@@ -206,7 +207,7 @@ export const ModifierForm: React.FC<ModifierFormProps> = ({
                 variant="outline"
                 size="md"
                 onClick={onClose}
-                disabled={isLoading}
+                disabled={createModifierMutation.isPending || updateModifierMutation.isPending}
               >
                 Cancel
               </Button>
@@ -214,7 +215,7 @@ export const ModifierForm: React.FC<ModifierFormProps> = ({
                 type="submit"
                 variant="primary"
                 size="md"
-                isLoading={isLoading}
+                isLoading={createModifierMutation.isPending || updateModifierMutation.isPending}
               >
                 {modifier ? 'Save Changes' : 'Create Modifier'}
               </Button>
@@ -244,7 +245,7 @@ export const ModifierForm: React.FC<ModifierFormProps> = ({
                   variant="outline"
                   size="md"
                   onClick={() => setShowDeleteConfirm(false)}
-                  disabled={isLoading}
+                  disabled={createModifierMutation.isPending || updateModifierMutation.isPending}
                   className="flex-1"
                 >
                   Cancel
@@ -253,7 +254,7 @@ export const ModifierForm: React.FC<ModifierFormProps> = ({
                   variant="danger"
                   size="md"
                   onClick={handleDelete}
-                  isLoading={isLoading}
+                  isLoading={createModifierMutation.isPending || updateModifierMutation.isPending}
                   className="flex-1"
                 >
                   Delete

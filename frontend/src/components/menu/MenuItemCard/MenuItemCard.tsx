@@ -1,5 +1,6 @@
 import React from 'react';
 import { Edit2, Trash2, ImageOff } from 'lucide-react';
+import { LazyImage } from '@/shared/components/LazyImage';
 import type { MenuItemResponse, CategoryResponse } from '@/types/menu';
 
 interface MenuItemCardProps {
@@ -30,10 +31,13 @@ export const MenuItemCard: React.FC<MenuItemCardProps> = ({
       {/* Image */}
       <div className="relative aspect-video w-full overflow-hidden bg-gray-100">
         {item.image_url ? (
-          <img
+          <LazyImage
             src={item.image_url}
             alt={item.name}
             className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
+            enableWebP={true}
+            srcsetSizes={['400w', '800w', '1200w']}
+            sizes="(max-width: 768px) 100vw, (max-width: 1024px) 50vw, 33vw"
           />
         ) : (
           <div className="flex h-full w-full items-center justify-center">

@@ -50,6 +50,7 @@ from restaurant_voice_assistant.infrastructure.openai.embeddings import (
     add_embedding_task
 )
 from restaurant_voice_assistant.api.middleware.request_id import get_request_id
+import asyncio
 import logging
 
 router = APIRouter()
@@ -68,7 +69,7 @@ logger = logging.getLogger(__name__)
         500: {"description": "Failed to fetch operating hours"}
     }
 )
-def list_operating_hours(
+async def list_operating_hours(
     request: Request,
     restaurant_id: str = Path(..., description="Restaurant UUID"),
     x_vapi_secret: Optional[str] = Header(
@@ -78,7 +79,7 @@ def list_operating_hours(
     require_restaurant_access(request, restaurant_id, x_vapi_secret)
 
     try:
-        items = list_operating_hours_service(restaurant_id)
+        items = await asyncio.to_thread(list_operating_hours_service, restaurant_id)
         return items
     except Exception as e:
         logger.error(
@@ -101,7 +102,7 @@ def list_operating_hours(
         500: {"description": "Failed to fetch operating hour"}
     }
 )
-def get_operating_hour(
+async def get_operating_hour(
     request: Request,
     restaurant_id: str = Path(..., description="Restaurant UUID"),
     hour_id: str = Path(..., description="Operating hour UUID"),
@@ -112,7 +113,7 @@ def get_operating_hour(
     require_restaurant_access(request, restaurant_id, x_vapi_secret)
 
     try:
-        item = get_operating_hour_service(restaurant_id, hour_id)
+        item = await asyncio.to_thread(get_operating_hour_service, restaurant_id, hour_id)
         if not item:
             raise HTTPException(
                 status_code=404, detail="Operating hour not found")
@@ -140,7 +141,7 @@ def get_operating_hour(
         500: {"description": "Failed to update operating hours"}
     }
 )
-def update_operating_hours(
+async def update_operating_hours(
     http_request: Request,
     background_tasks: BackgroundTasks,
     restaurant_id: str = Path(..., description="Restaurant UUID"),
@@ -153,7 +154,7 @@ def update_operating_hours(
 
     try:
         hours_data = [hour.dict() for hour in request.hours]
-        items = update_operating_hours_service(restaurant_id, hours_data)
+        items = await asyncio.to_thread(update_operating_hours_service, restaurant_id, hours_data)
 
         add_embedding_task(background_tasks, restaurant_id, "hours")
 
@@ -180,7 +181,7 @@ def update_operating_hours(
         500: {"description": "Failed to delete operating hours"}
     }
 )
-def delete_operating_hours(
+async def delete_operating_hours(
     http_request: Request,
     background_tasks: BackgroundTasks,
     restaurant_id: str = Path(..., description="Restaurant UUID"),
@@ -191,7 +192,7 @@ def delete_operating_hours(
     require_restaurant_access(http_request, restaurant_id, x_vapi_secret)
 
     try:
-        delete_operating_hours_service(restaurant_id)
+        await asyncio.to_thread(delete_operating_hours_service, restaurant_id)
 
         add_embedding_task(background_tasks, restaurant_id, "hours")
 

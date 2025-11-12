@@ -41,6 +41,7 @@ from restaurant_voice_assistant.domain.calls.service import (
 from restaurant_voice_assistant.infrastructure.auth.service import (
     require_restaurant_access
 )
+import asyncio
 import logging
 
 router = APIRouter()
@@ -76,7 +77,7 @@ logger = logging.getLogger(__name__)
         500: {"description": "Failed to fetch call history"}
     }
 )
-def list_calls(
+async def list_calls(
     request: Request,
     x_restaurant_id: Optional[str] = Header(
         None, alias="X-Restaurant-Id", description="Restaurant UUID (alternative to query param)"),
@@ -101,7 +102,7 @@ def list_calls(
     require_restaurant_access(request, restaurant_id, x_vapi_secret)
 
     try:
-        calls = list_calls_service(restaurant_id, limit)
+        calls = await asyncio.to_thread(list_calls_service, restaurant_id, limit)
         return {"data": calls}
     except Exception as e:
         logger.error(
@@ -122,7 +123,7 @@ def list_calls(
         500: {"description": "Failed to fetch call record"}
     }
 )
-def get_call(
+async def get_call(
     request: Request,
     call_id: str = Path(..., description="Call record UUID"),
     x_restaurant_id: Optional[str] = Header(
@@ -145,7 +146,7 @@ def get_call(
     require_restaurant_access(request, restaurant_id, x_vapi_secret)
 
     try:
-        call = get_call_service(call_id, restaurant_id)
+        call = await asyncio.to_thread(get_call_service, call_id, restaurant_id)
         if not call:
             raise HTTPException(
                 status_code=404, detail="Call not found")

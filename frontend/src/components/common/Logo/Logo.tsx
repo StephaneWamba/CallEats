@@ -29,7 +29,7 @@ export const Logo: React.FC<LogoProps> = ({ size = 'md', showText = true }) => {
       {/* Logo Text */}
       {showText && (
         <span className={`${textSizeClasses[size]} font-bold text-gray-900`}>
-          Restaurant Voice Assistant
+          CallEats
         </span>
       )}
     </div>

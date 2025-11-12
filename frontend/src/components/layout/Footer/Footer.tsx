@@ -10,7 +10,7 @@ export const Footer: React.FC = () => {
         <div className="flex flex-col items-center justify-between gap-4 sm:flex-row">
           {/* Left: Copyright */}
           <div className="flex items-center gap-2 text-sm text-gray-600">
-            <span>© {currentYear} Restaurant Voice Assistant</span>
+            <span>© {currentYear} CallEats</span>
             <span className="hidden sm:inline">•</span>
             <span className="hidden sm:inline">All rights reserved</span>
           </div>

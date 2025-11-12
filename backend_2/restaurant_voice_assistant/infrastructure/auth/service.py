@@ -60,7 +60,7 @@ def get_current_user(request: Request) -> Dict[str, Any]:
     if not user:
         raise HTTPException(
             status_code=401,
-            detail="Authentication required. Please provide a valid JWT token in Authorization header."
+            detail="Authentication required. Please login to access this resource."
         )
     return user
 
@@ -71,47 +71,16 @@ def get_restaurant_id(request: Request) -> str:
     Raises:
         HTTPException: If user is not authenticated (401) or has no restaurant association (403)
     """
-    import logging
-    import sys
-    logger = logging.getLogger(__name__)
-    
-    # Force log to stderr to ensure it's captured
-    print(f"get_restaurant_id: FUNCTION CALLED", file=sys.stderr, flush=True)
-    
-    # Debug: Check request.state.user directly - use ERROR level to ensure it's logged
-    state_user = getattr(request.state, "user", None)
-    print(f"get_restaurant_id: request.state.user exists: {state_user is not None}", file=sys.stderr, flush=True)
-    logger.error(f"get_restaurant_id: request.state.user exists: {state_user is not None}")
-    if state_user:
-        print(f"get_restaurant_id: request.state.user content: {state_user}", file=sys.stderr, flush=True)
-        print(f"get_restaurant_id: restaurant_id in state_user: {state_user.get('restaurant_id')}", file=sys.stderr, flush=True)
-        logger.error(f"get_restaurant_id: request.state.user content: {state_user}")
-        logger.error(f"get_restaurant_id: restaurant_id in state_user: {state_user.get('restaurant_id')}")
-        logger.error(f"get_restaurant_id: restaurant_id type: {type(state_user.get('restaurant_id'))}")
-        logger.error(f"get_restaurant_id: restaurant_id is None: {state_user.get('restaurant_id') is None}")
-        logger.error(f"get_restaurant_id: restaurant_id bool check: {bool(state_user.get('restaurant_id'))}")
-    
-    try:
-        user = get_current_user(request)
-        print(f"get_restaurant_id: After get_current_user - user={user.get('user_id')}", file=sys.stderr, flush=True)
-        restaurant_id = user.get("restaurant_id")
-        print(f"get_restaurant_id: restaurant_id={restaurant_id}, type={type(restaurant_id)}", file=sys.stderr, flush=True)
-        logger.error(f"get_restaurant_id: After get_current_user - user={user.get('user_id')}, restaurant_id={restaurant_id}, restaurant_id type={type(restaurant_id)}")
-        if not restaurant_id:
-            print(f"get_restaurant_id: User {user.get('user_id')} has no restaurant_id. User dict: {user}", file=sys.stderr, flush=True)
-            logger.error(f"get_restaurant_id: User {user.get('user_id')} has no restaurant_id. User dict: {user}")
-            raise HTTPException(
-                status_code=403,
-                detail="User is not associated with a restaurant"
-            )
-        return restaurant_id
-    except HTTPException:
-        print(f"get_restaurant_id: HTTPException raised", file=sys.stderr, flush=True)
-        raise
-    except Exception as e:
-        print(f"get_restaurant_id: Exception: {e}", file=sys.stderr, flush=True)
-        logger.error(f"get_restaurant_id: Exception: {e}", exc_info=True)
-        raise
+    user = get_current_user(request)
+    restaurant_id = user.get("restaurant_id")
+
+    if not restaurant_id:
+        raise HTTPException(
+            status_code=403,
+            detail="User is not associated with a restaurant"
+        )
+
+    return restaurant_id
 
 
 def require_auth(request: Request, x_vapi_secret: Optional[str] = None) -> Optional[Dict[str, Any]]:

@@ -55,17 +55,26 @@ class AuthMiddleware(BaseHTTPMiddleware):
         # Skip for public endpoints
         public_paths = ["/api/health", "/docs", "/openapi.json", "/"]
         public_auth_paths = ["/api/auth/register",
-                             "/api/auth/login", "/api/auth/logout"]
+                             "/api/auth/login",
+                             "/api/auth/logout",
+                             "/api/auth/refresh"]  # Refresh endpoint is public
 
         if request.url.path in public_paths or request.url.path in public_auth_paths:
             request.state.user = None
             return await call_next(request)
 
-        # Extract token from Authorization header
-        auth_header = request.headers.get("Authorization")
+        # Extract token from cookie (preferred) or Authorization header (backward compatibility)
         token = None
-        if auth_header and auth_header.startswith("Bearer "):
-            token = auth_header.split(" ")[1]
+        auth_header = None
+
+        # Try cookie first (new httpOnly cookie approach)
+        token = request.cookies.get("access_token")
+
+        # Fallback to Authorization header for backward compatibility
+        if not token:
+            auth_header = request.headers.get("Authorization")
+            if auth_header and auth_header.startswith("Bearer "):
+                token = auth_header.split(" ")[1]
 
         # Verify JWT if present
         if token:
@@ -86,7 +95,8 @@ class AuthMiddleware(BaseHTTPMiddleware):
                     if user_resp.data:
                         user_data = user_resp.data[0]
                         restaurant_id = user_data["restaurant_id"]
-                        logger.info(f"AuthMiddleware: Found user {user_id}, restaurant_id: {restaurant_id}")
+                        logger.info(
+                            f"AuthMiddleware: Found user {user_id}, restaurant_id: {restaurant_id}")
                         request.state.user = {
                             "user_id": user_id,
                             "email": email or user_data.get("email"),
@@ -94,17 +104,19 @@ class AuthMiddleware(BaseHTTPMiddleware):
                             "role": user_data.get("role", "user")
                         }
                     else:
-                        logger.warning(f"AuthMiddleware: User {user_id} not found in users table")
+                        logger.warning(
+                            f"AuthMiddleware: User {user_id} not found in users table")
                         request.state.user = None
                 else:
-                    logger.warning("AuthMiddleware: Invalid user_response or user")
+                    logger.warning(
+                        "AuthMiddleware: Invalid user_response or user")
                     request.state.user = None
             except Exception as e:
-                logger.error(f"AuthMiddleware: Exception during user lookup: {e}", exc_info=True)
+                logger.error(
+                    f"AuthMiddleware: Exception during user lookup: {e}", exc_info=True)
                 request.state.user = None
         else:
             request.state.user = None
 
         response = await call_next(request)
         return response
-

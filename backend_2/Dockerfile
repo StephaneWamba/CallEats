@@ -9,12 +9,12 @@ RUN apt-get update && apt-get install -y \
     && rm -rf /var/lib/apt/lists/*
 
 # Copy requirements and install Python dependencies
-COPY backend_2/requirements.txt .
+COPY backend/requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
 # Copy application code
-COPY backend_2/restaurant_voice_assistant ./restaurant_voice_assistant
-COPY backend_2/config ./config
+COPY backend/restaurant_voice_assistant ./restaurant_voice_assistant
+COPY backend/config ./config
 
 # Expose port (Railway sets PORT env var)
 EXPOSE 8000

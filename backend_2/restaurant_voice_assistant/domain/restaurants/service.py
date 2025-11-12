@@ -31,10 +31,11 @@ from typing import Optional, Dict, Any
 from uuid import uuid4
 from datetime import datetime, timezone
 from restaurant_voice_assistant.infrastructure.database.client import get_supabase_service_client
+from restaurant_voice_assistant.infrastructure.database.transactions import transaction
 from restaurant_voice_assistant.domain.phones.service import assign_phone_to_restaurant
 from restaurant_voice_assistant.core.config import get_settings
 from restaurant_voice_assistant.infrastructure.vapi.client import VapiClient
-from restaurant_voice_assistant.core.exceptions import VapiAPIError
+from restaurant_voice_assistant.core.exceptions import VapiAPIError, RestaurantVoiceAssistantError
 import logging
 
 logger = logging.getLogger(__name__)
@@ -48,6 +49,9 @@ def create_restaurant(
 ) -> Dict[str, Any]:
     """Create a new restaurant.
 
+    Uses transaction context to ensure atomicity. If phone assignment fails,
+    the restaurant creation is still committed (phone assignment is non-critical).
+
     Args:
         name: Restaurant name
         api_key: Optional custom API key (auto-generated if not provided)
@@ -58,24 +62,26 @@ def create_restaurant(
         Dictionary with restaurant data including phone_number if assigned
 
     Raises:
-        Exception: If restaurant creation fails
+        RestaurantVoiceAssistantError: If restaurant creation fails
     """
-    supabase = get_supabase_service_client()
-
     final_api_key = api_key or f"api_key_{uuid4().hex[:16]}"
 
-    result = supabase.table("restaurants").insert({
-        "name": name,
-        "api_key": final_api_key
-    }).execute()
+    # Use transaction context for atomic operations
+    with transaction() as supabase:
+        result = supabase.table("restaurants").insert({
+            "name": name,
+            "api_key": final_api_key
+        }).execute()
 
-    if not result.data:
-        raise Exception("Failed to create restaurant")
+        if not result.data:
+            raise RestaurantVoiceAssistantError("Failed to create restaurant")
 
-    restaurant_data = result.data[0]
-    restaurant_id = restaurant_data["id"]
+        restaurant_data = result.data[0]
+        restaurant_id = restaurant_data["id"]
+
+    # Phone assignment is done outside transaction as it's non-critical
+    # and involves external API calls (Vapi/Twilio)
     phone_number = None
-
     if assign_phone:
         try:
             phone_number = assign_phone_to_restaurant(
@@ -83,6 +89,7 @@ def create_restaurant(
         except Exception as e:
             logger.warning(
                 f"Failed to assign phone number to restaurant {restaurant_id}: {e}")
+            # Restaurant is still created, just without phone number
 
     return {
         "id": restaurant_id,
@@ -235,13 +242,15 @@ def get_restaurant_stats(restaurant_id: str) -> Dict[str, Any]:
         ).eq("restaurant_id", restaurant_id).gte(
             "started_at", today_start_iso
         ).execute()
-        total_calls_today = calls_resp.count if hasattr(calls_resp, 'count') else len(calls_resp.data or [])
+        total_calls_today = calls_resp.count if hasattr(
+            calls_resp, 'count') else len(calls_resp.data or [])
 
         # Count menu items
         menu_items_resp = supabase.table("menu_items").select(
             "id", count="exact"
         ).eq("restaurant_id", restaurant_id).execute()
-        menu_items_count = menu_items_resp.count if hasattr(menu_items_resp, 'count') else len(menu_items_resp.data or [])
+        menu_items_count = menu_items_resp.count if hasattr(
+            menu_items_resp, 'count') else len(menu_items_resp.data or [])
 
         # Check phone status
         phone_mappings = supabase.table("restaurant_phone_mappings").select(
@@ -253,7 +262,8 @@ def get_restaurant_stats(restaurant_id: str) -> Dict[str, Any]:
         categories_resp = supabase.table("categories").select(
             "id", count="exact"
         ).eq("restaurant_id", restaurant_id).execute()
-        categories_count = categories_resp.count if hasattr(categories_resp, 'count') else len(categories_resp.data or [])
+        categories_count = categories_resp.count if hasattr(
+            categories_resp, 'count') else len(categories_resp.data or [])
 
         return {
             "total_calls_today": total_calls_today,
@@ -307,26 +317,30 @@ def delete_restaurant(restaurant_id: str) -> bool:
                     # Find matching phone number
                     phone_clean = phone_number.replace(" ", "").replace(
                         "(", "").replace(")", "").replace("-", "")
-                    
+
                     for pn in phone_numbers:
                         pn_number = pn.get("number", "")
                         pn_clean = pn_number.replace(" ", "").replace(
                             "(", "").replace(")", "").replace("-", "")
-                        
+
                         if pn_clean == phone_clean or pn_clean in phone_clean or phone_clean in pn_clean:
                             phone_id = pn.get("id")
                             if phone_id:
                                 # Unassign from assistant (set assistantId to None)
-                                client.update_phone_number(phone_id, {"assistantId": None})
-                                logger.info(f"Unassigned phone number {phone_number} from Vapi assistant")
+                                client.update_phone_number(
+                                    phone_id, {"assistantId": None})
+                                logger.info(
+                                    f"Unassigned phone number {phone_number} from Vapi assistant")
                             break
             except VapiAPIError as e:
-                logger.warning(f"Failed to unassign phone number from Vapi: {e}")
+                logger.warning(
+                    f"Failed to unassign phone number from Vapi: {e}")
             except Exception as e:
                 logger.warning(f"Error unassigning phone number: {e}")
 
         # Step 3: Delete restaurant (cascade delete handles all related records)
-        resp = supabase.table("restaurants").delete().eq("id", restaurant_id).execute()
+        resp = supabase.table("restaurants").delete().eq(
+            "id", restaurant_id).execute()
 
         if resp.data:
             logger.info(f"Successfully deleted restaurant {restaurant_id}")
@@ -337,4 +351,3 @@ def delete_restaurant(restaurant_id: str) -> bool:
         logger.error(
             f"Error deleting restaurant {restaurant_id}: {e}", exc_info=True)
         raise
-

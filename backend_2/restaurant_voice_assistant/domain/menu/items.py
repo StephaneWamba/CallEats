@@ -30,7 +30,7 @@ Usage:
 from typing import List, Dict, Any, Optional
 from decimal import Decimal
 from restaurant_voice_assistant.infrastructure.database.client import get_supabase_service_client
-from restaurant_voice_assistant.infrastructure.cache.manager import clear_cache
+from restaurant_voice_assistant.infrastructure.cache.invalidation import invalidate_cache
 import logging
 
 logger = logging.getLogger(__name__)
@@ -124,6 +124,7 @@ def get_menu_item(restaurant_id: str, item_id: str) -> Optional[Dict[str, Any]]:
         raise
 
 
+@invalidate_cache(category="menu")
 def create_menu_item(
     restaurant_id: str,
     name: str,
@@ -177,8 +178,6 @@ def create_menu_item(
 
         item = resp.data[0]
 
-        clear_cache(restaurant_id, "menu")
-
         return item
     except Exception as e:
         logger.error(
@@ -186,6 +185,7 @@ def create_menu_item(
         raise
 
 
+@invalidate_cache(category="menu")
 def update_menu_item(
     restaurant_id: str,
     item_id: str,
@@ -246,8 +246,6 @@ def update_menu_item(
         if not resp.data:
             return None
 
-        clear_cache(restaurant_id, "menu")
-
         return resp.data[0]
     except Exception as e:
         logger.error(
@@ -255,6 +253,7 @@ def update_menu_item(
         raise
 
 
+@invalidate_cache(category="menu")
 def delete_menu_item(restaurant_id: str, item_id: str) -> bool:
     """Delete a menu item.
 
@@ -275,7 +274,6 @@ def delete_menu_item(restaurant_id: str, item_id: str) -> bool:
             "restaurant_id", restaurant_id).eq("id", item_id).execute()
 
         if resp.data:
-            clear_cache(restaurant_id, "menu")
             return True
         return False
     except Exception as e:

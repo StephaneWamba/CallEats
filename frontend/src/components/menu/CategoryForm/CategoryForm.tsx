@@ -3,10 +3,11 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { X, Trash2 } from 'lucide-react';
-import { useAppSelector } from '@/store/hooks';
-import { createCategory, updateCategory, deleteCategory } from '@/api/categories';
+import { useRestaurant } from '@/hooks/useRestaurant';
+import { useCreateCategory, useUpdateCategory, useDeleteCategory } from '@/features/menu/hooks';
 import { Button } from '../../common/Button';
 import { Input } from '../../common/Input';
+import { getErrorMessage } from '@/utils/errorHandler';
 import type { CategoryResponse, CreateCategoryRequest, UpdateCategoryRequest } from '@/types/menu';
 
 const categorySchema = z.object({
@@ -28,9 +29,11 @@ export const CategoryForm: React.FC<CategoryFormProps> = ({
   onClose,
   onSuccess,
 }) => {
-  const { restaurant } = useAppSelector((state) => state.restaurant);
+  const { data: restaurant } = useRestaurant();
+  const createCategoryMutation = useCreateCategory();
+  const updateCategoryMutation = useUpdateCategory();
+  const deleteCategoryMutation = useDeleteCategory();
   const [error, setError] = useState<string | null>(null);
-  const [isLoading, setIsLoading] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
 
   const {
@@ -53,7 +56,6 @@ export const CategoryForm: React.FC<CategoryFormProps> = ({
     }
 
     setError(null);
-    setIsLoading(true);
 
     try {
       if (category) {
@@ -63,7 +65,11 @@ export const CategoryForm: React.FC<CategoryFormProps> = ({
           description: data.description || null,
           display_order: data.display_order,
         };
-        await updateCategory(restaurant.id, category.id, updateData);
+        await updateCategoryMutation.mutateAsync({
+          restaurantId: restaurant.id,
+          categoryId: category.id,
+          data: updateData,
+        });
       } else {
         // Create new category
         const createData: CreateCategoryRequest = {
@@ -71,17 +77,15 @@ export const CategoryForm: React.FC<CategoryFormProps> = ({
           description: data.description || null,
           display_order: data.display_order,
         };
-        await createCategory(restaurant.id, createData);
+        await createCategoryMutation.mutateAsync({
+          restaurantId: restaurant.id,
+          data: createData,
+        });
       }
       onSuccess();
     } catch (err: unknown) {
-      if (err instanceof Error) {
-        setError(err.message);
-      } else {
-        setError('Failed to save category. Please try again.');
-      }
-    } finally {
-      setIsLoading(false);
+      const errorMessage = getErrorMessage(err, 'Failed to save category. Please try again.');
+      setError(errorMessage);
     }
   };
 
@@ -89,20 +93,17 @@ export const CategoryForm: React.FC<CategoryFormProps> = ({
     if (!restaurant || !category) return;
 
     setError(null);
-    setIsLoading(true);
 
     try {
-      await deleteCategory(restaurant.id, category.id);
+      await deleteCategoryMutation.mutateAsync({
+        restaurantId: restaurant.id,
+        categoryId: category.id,
+      });
+      setShowDeleteConfirm(false);
       onSuccess();
     } catch (err: unknown) {
-      if (err instanceof Error) {
-        setError(err.message);
-      } else {
-        setError('Failed to delete category. Please try again.');
-      }
-    } finally {
-      setIsLoading(false);
-      setShowDeleteConfirm(false);
+      const errorMessage = getErrorMessage(err, 'Failed to delete category. Please try again.');
+      setError(errorMessage);
     }
   };
 
@@ -194,7 +195,7 @@ export const CategoryForm: React.FC<CategoryFormProps> = ({
                 variant="outline"
                 size="md"
                 onClick={onClose}
-                disabled={isLoading}
+                disabled={createCategoryMutation.isPending || updateCategoryMutation.isPending}
               >
                 Cancel
               </Button>
@@ -202,7 +203,7 @@ export const CategoryForm: React.FC<CategoryFormProps> = ({
                 type="submit"
                 variant="primary"
                 size="md"
-                isLoading={isLoading}
+                isLoading={createCategoryMutation.isPending || updateCategoryMutation.isPending}
               >
                 {category ? 'Save Changes' : 'Create Category'}
               </Button>
@@ -232,7 +233,7 @@ export const CategoryForm: React.FC<CategoryFormProps> = ({
                   variant="outline"
                   size="md"
                   onClick={() => setShowDeleteConfirm(false)}
-                  disabled={isLoading}
+                  disabled={createCategoryMutation.isPending || updateCategoryMutation.isPending}
                   className="flex-1"
                 >
                   Cancel
@@ -241,7 +242,7 @@ export const CategoryForm: React.FC<CategoryFormProps> = ({
                   variant="danger"
                   size="md"
                   onClick={handleDelete}
-                  isLoading={isLoading}
+                  isLoading={createCategoryMutation.isPending || updateCategoryMutation.isPending}
                   className="flex-1"
                 >
                   Delete

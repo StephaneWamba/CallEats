@@ -22,12 +22,7 @@ export interface RegisterWithRestaurantResponse {
     phone_number: string | null;
     api_key: string;
   };
-  session: {
-    access_token: string;
-    refresh_token: string;
-    expires_in: number;
-    token_type: string;
-  };
+  // Tokens are in httpOnly cookies, not in response body
 }
 
 export interface LoginRequest {
@@ -36,14 +31,12 @@ export interface LoginRequest {
 }
 
 export interface LoginResponse {
-  access_token: string;
-  refresh_token: string;
-  expires_in: number;
-  token_type: string;
   user: {
     id: string;  // Note: Backend returns 'id', not 'user_id'
     email: string;
   };
+  message: string;
+  // Tokens are in httpOnly cookies, not in response body
 }
 
 export interface ResetPasswordRequest {
@@ -55,16 +48,8 @@ export interface ChangePasswordRequest {
   new_password: string;
 }
 
-export interface RefreshTokenRequest {
-  refresh_token: string;
-}
-
-export interface RefreshTokenResponse {
-  access_token: string;
-  refresh_token?: string;
-  expires_in: number;
-  token_type: string;
-}
+// RefreshTokenRequest is no longer needed - refresh token comes from cookie
+// RefreshTokenResponse is no longer needed - tokens are in cookies
 
 export interface UserResponse {
   user_id: string;
