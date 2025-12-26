@@ -23,3 +23,4 @@ export const MapClickHandler: React.FC<MapClickHandlerProps> = ({ onMapClick }) 
 
 
 
+

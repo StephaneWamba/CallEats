@@ -6,3 +6,4 @@ export const operatingHoursKeys = {
   list: (restaurantId: string) => [...operatingHoursKeys.all, 'list', restaurantId] as const,
 };
 
+

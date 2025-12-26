@@ -40,3 +40,4 @@ export const MenuSearchBar: React.FC<MenuSearchBarProps> = ({
   );
 };
 
+

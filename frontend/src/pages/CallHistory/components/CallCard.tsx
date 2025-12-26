@@ -100,3 +100,4 @@ export const CallCard: React.FC<CallCardProps> = ({ call, onViewDetails }) => {
   );
 };
 
+

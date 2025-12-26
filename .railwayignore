@@ -63,6 +63,6 @@ private/
 # Tools (not needed in production)
 tools/
 
-# Old backend
-backend/
+# Old backend (if exists)
+backend_2/
 
