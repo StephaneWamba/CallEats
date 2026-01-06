@@ -4,9 +4,7 @@ Multi-tenant voice assistant system for restaurants using Vapi.ai, semantic sear
 
 ## Overview
 
-Restaurants receive countless phone calls asking about menu items, hours, delivery zones, and availability. Staff spend hours answering repetitive questions, leading to missed calls during peak hours and inconsistent information delivery.
-
-CallEats automates restaurant phone interactions through an AI voice assistant powered by Vapi.ai. The system uses semantic search with OpenAI embeddings and pgvector to provide accurate, restaurant-specific answers to customer queries in natural conversation.
+AI-powered voice assistant for restaurants that automates phone inquiries using Vapi.ai and semantic search. Handles menu questions, hours, delivery zones, and availability through natural conversation.
 
 ## Key Capabilities
 
@@ -22,63 +20,69 @@ CallEats automates restaurant phone interactions through an AI voice assistant p
 
 ```mermaid
 graph TB
-    A[Customer Phone Call] --> B[Vapi.ai Voice Assistant]
-    B --> C[FastAPI Backend]
-    C --> D[Phone Number Mapping]
-    D --> E[Restaurant ID Resolution]
-    C --> F[Vector Search Service]
-    F --> G[OpenAI Embeddings]
-    F --> H[Supabase pgvector]
-    C --> I[Call History Service]
-    I --> J[Vapi API Fetch]
-    C --> K[Cache Layer]
-    K --> L[Redis / In-Memory]
-    C --> M[React Frontend]
-    M --> N[Restaurant Dashboard]
+    subgraph "Customer"
+        A[Phone Call]
+    end
+
+    subgraph "Voice AI"
+        B[Vapi.ai Assistant]
+        C[GPT-4o-mini]
+    end
+
+    subgraph "Backend API"
+        D[FastAPI Server]
+        E[Phone Mapping]
+        F[Vector Search]
+        G[Call History]
+        H[Cache Layer]
+    end
+
+    subgraph "Data Layer"
+        I[(Supabase<br/>PostgreSQL)]
+        J[pgvector<br/>Embeddings]
+        K[(Redis Cache)]
+    end
+
+    subgraph "External Services"
+        L[OpenAI<br/>Embeddings API]
+    end
+
+    subgraph "Frontend"
+        M[React Dashboard]
+    end
+
+    A --> B
+    B --> C
+    B --> D
+    D --> E
+    D --> F
+    D --> G
+    D --> H
+    E --> I
+    F --> J
+    F --> L
+    G --> I
+    H --> K
+    H --> I
+    M --> D
 
     style A fill:#3b82f6
     style B fill:#8b5cf6
-    style C fill:#10b981
+    style D fill:#10b981
     style F fill:#f59e0b
-    style H fill:#06b6d4
+    style I fill:#06b6d4
     style M fill:#ef4444
 ```
 
 ## Technical Approach
 
-### Multi-Tenant Design
+**Multi-Tenant**: All data scoped by `restaurant_id` with RLS policies and isolated vector search.
 
-All data scoped by `restaurant_id`:
+**Voice Integration**: Vapi.ai function tools (`get_menu_info`, `get_modifiers_info`, `get_hours_info`, `get_zones_info`) route to restaurant-specific data.
 
-- Row-level security (RLS) in Supabase
-- Restaurant-scoped vector search
-- Isolated call history and menu data
-- Phone number → restaurant_id mapping for call routing
+**Vector Search**: OpenAI embeddings → pgvector similarity search → cached results (60s TTL).
 
-### Voice Assistant Integration
-
-Vapi.ai handles voice interaction:
-
-- Function tools: `get_menu_info`, `get_modifiers_info`, `get_hours_info`, `get_zones_info`
-- Natural conversation with GPT-4o-mini
-- Restaurant-specific responses via metadata injection
-- Webhook reliability with scheduled API fetches
-
-### Vector Search Pipeline
-
-1. **Query Processing**: Extract user query from Vapi tool call
-2. **Embedding Generation**: Generate OpenAI embedding for query
-3. **Vector Search**: pgvector cosine similarity search with restaurant_id filter
-4. **Result Formatting**: Return top 5 results with metadata for TTS enhancement
-5. **Caching**: Store results with 60-second TTL
-
-### Call Data Management
-
-Dual mechanism for call tracking:
-
-- **Webhook Events**: `assistant-request`, `status-update`, `end-of-call-report`
-- **Scheduled API Fetch**: Background thread fetches call data 30 seconds after detection
-- **Fallback Protection**: Ensures complete call data even if webhooks fail
+**Call Tracking**: Webhook events + scheduled API fetch fallback for reliability.
 
 ## Technology Stack
 
@@ -98,45 +102,22 @@ Dual mechanism for call tracking:
 
 ## Key Features
 
-### Restaurant Dashboard
-
-- Real-time call statistics (calls today, menu items, categories, phone status)
-- Recent call history with transcripts
-- Quick actions for common tasks
-
-### Menu Builder
-
-- Category management with display ordering
-- Menu item CRUD with modifiers
-- Image uploads for menu items
-- Search and filter functionality
-
-### Call History
-
-- Complete call transcripts (user/assistant messages only)
-- Call metadata (duration, cost, outcome, caller)
-- Filtering and search
-
-### Delivery Zones
-
-- Geographic zone definition with Leaflet maps
-- Delivery fee and minimum order configuration
-- Zone visualization and editing
-
-### Operating Hours
-
-- Day-of-week scheduling
-- Open/close time configuration
-- Closed day handling
+- **Dashboard**: Real-time call stats, recent history, quick actions
+- **Menu Builder**: Category/item management, modifiers, image uploads
+- **Call History**: Complete transcripts, metadata, filtering
+- **Delivery Zones**: Geographic zones with Leaflet maps, fee configuration
+- **Operating Hours**: Day-of-week scheduling, open/close times
 
 ## Infrastructure
 
-**Backend**: Railway (FastAPI service)  
-**Frontend**: Vercel (React SPA)  
-**Database**: Supabase (PostgreSQL with pgvector)  
-**Cache**: Railway Redis (optional, falls back to in-memory)  
-**Voice**: Vapi.ai (voice assistant platform)  
-**Monitoring**: Sentry (error tracking)
+| Service    | Platform      | Purpose                                |
+| ---------- | ------------- | -------------------------------------- |
+| Backend    | Railway       | FastAPI service                        |
+| Frontend   | Vercel        | React SPA                              |
+| Database   | Supabase      | PostgreSQL + pgvector                  |
+| Cache      | Railway Redis | Distributed cache (in-memory fallback) |
+| Voice      | Vapi.ai       | Voice assistant platform               |
+| Monitoring | Sentry        | Error tracking                         |
 
 ## Getting Started
 
@@ -183,37 +164,28 @@ Use `scripts/setup_vapi.py` to configure Vapi.ai assistant with function tools a
 
 ## Use Cases
 
-- **Menu Inquiries**: "What's on your menu?", "Do you have vegetarian options?"
-- **Pricing Questions**: "How much is the pizza?", "What's the price for delivery?"
-- **Hours Information**: "When are you open?", "Are you open on Sundays?"
-- **Delivery Coverage**: "Do you deliver to downtown?", "What's the delivery fee?"
-- **Modifier Questions**: "What can I add to my burger?", "Do you have extra cheese?"
+Menu inquiries, pricing questions, hours information, delivery coverage, modifier questions.
 
 ## Key Differentiators
 
-1. **Multi-Tenant Architecture**: Shared assistant instance with isolated restaurant data
-2. **Semantic Search**: Vector similarity search for natural language queries
-3. **Production-Ready**: Comprehensive error handling, rate limiting, monitoring
-4. **Webhook Reliability**: Fallback mechanisms ensure complete call data
-5. **Real-Time Updates**: Automatic embedding regeneration on menu changes
-6. **Scalable Caching**: Redis-based distributed caching with graceful fallback
+1. Multi-tenant architecture with shared assistant instance
+2. Semantic search via vector similarity
+3. Production-ready with error handling, rate limiting, monitoring
+4. Webhook reliability with API fetch fallback
+5. Real-time embedding updates on menu changes
+6. Scalable Redis caching with graceful fallback
 
-## Performance Characteristics
+## Performance
 
-- **Search Latency**: 200-500ms average (with cache), 1-2s (cache miss)
-- **Embedding Generation**: 100-300ms per query
-- **Vector Search**: 50-200ms (pgvector HNSW index)
-- **Cache Hit Rate**: 60-80% for repeated queries
-- **Call Data Fetch**: 2-5s for complete call retrieval
+- Search: 200-500ms (cached), 1-2s (cache miss)
+- Embeddings: 100-300ms per query
+- Vector search: 50-200ms (HNSW index)
+- Cache hit rate: 60-80%
+- Call data fetch: 2-5s
 
 ## Security
 
-- JWT authentication for frontend API access
-- X-Vapi-Secret header validation for webhooks
-- Row-level security (RLS) in Supabase
-- Rate limiting per user/endpoint
-- Request validation and timeout protection
-- Security headers middleware (CORS, CSP, etc.)
+JWT auth, webhook secret validation, RLS policies, rate limiting, request validation, security headers.
 
 ## Documentation
 

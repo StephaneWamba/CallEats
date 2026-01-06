@@ -1,17 +1,17 @@
 # CallEats Architecture
 
-This document describes the system architecture, data flows, and key design decisions for CallEats.
+System architecture, data flows, and design decisions.
 
 ## System Overview
 
-CallEats is a multi-tenant voice assistant system for restaurants. The architecture consists of:
+Multi-tenant voice assistant system with:
 
-- **FastAPI Backend**: REST API with async support, middleware stack, and domain-driven design
-- **Vapi.ai Integration**: Voice assistant platform handling phone calls and conversation
-- **Supabase Database**: PostgreSQL with pgvector extension for vector similarity search
-- **React Frontend**: TypeScript SPA for restaurant management dashboard
+- **FastAPI Backend**: REST API with async support and middleware stack
+- **Vapi.ai**: Voice assistant platform for phone calls
+- **Supabase**: PostgreSQL with pgvector for vector search
+- **React Frontend**: TypeScript SPA dashboard
 - **Redis Cache**: Distributed caching with in-memory fallback
-- **Sentry Monitoring**: Error tracking and performance monitoring
+- **Sentry**: Error tracking and monitoring
 
 ## Architecture Diagram
 
@@ -64,22 +64,50 @@ graph TB
 
 ### Tenant Isolation
 
-All data is scoped by `restaurant_id`:
+```mermaid
+graph TB
+    subgraph "Data Isolation"
+        A[All Queries] --> B[Filter by restaurant_id]
+        B --> C[RLS Policies]
+        B --> D[Vector Search Filter]
+        B --> E[Cache Key Prefix]
+    end
+    
+    subgraph "Isolation Layers"
+        C --> F[Database Level]
+        D --> G[Application Level]
+        E --> H[Cache Level]
+    end
+    
+    style B fill:#10b981
+    style C fill:#f59e0b
+```
 
-- **Database Level**: Row-level security (RLS) policies in Supabase
-- **Application Level**: All queries filter by `restaurant_id`
-- **Vector Search**: Restaurant-scoped embeddings with metadata filtering
-- **Cache Keys**: Include `restaurant_id` in cache key structure
+All data scoped by `restaurant_id`:
+- **Database**: RLS policies in Supabase
+- **Application**: All queries filter by `restaurant_id`
+- **Vector Search**: Restaurant-scoped embeddings
+- **Cache**: `restaurant_id` in cache keys
 
 ### Phone Number Routing
 
-Shared Vapi.ai assistant instance routes calls using phone number mapping:
+```mermaid
+sequenceDiagram
+    participant C as Customer
+    participant V as Vapi.ai
+    participant B as Backend
+    participant DB as Database
+    
+    C->>V: Calls restaurant phone
+    V->>B: assistant-request (phone)
+    B->>DB: Lookup restaurant_id
+    DB-->>B: restaurant_id
+    B->>B: Inject metadata
+    B-->>V: Restaurant context
+    Note over V,B: All tool calls include restaurant_id
+```
 
-1. Customer calls restaurant phone number
-2. Vapi.ai sends `assistant-request` webhook with phone number
-3. Backend looks up `restaurant_id` from `restaurant_phone_mappings` table
-4. Restaurant metadata injected into Vapi context
-5. All subsequent tool calls include `restaurant_id` for data isolation
+Shared Vapi.ai assistant routes calls via phone number → `restaurant_id` mapping.
 
 ## Voice Assistant Integration
 
@@ -93,77 +121,78 @@ sequenceDiagram
     participant DB as Database
 
     C->>V: Phone Call
-    V->>B: assistant-request (phone number)
+    V->>B: assistant-request (phone)
     B->>DB: Lookup restaurant_id
     DB-->>B: restaurant_id
-    B-->>V: Metadata (restaurant_id)
+    B-->>V: Metadata
 
     C->>V: "What's on your menu?"
     V->>B: Tool Call (get_menu_info)
-    B->>DB: Vector Search (restaurant_id filter)
-    DB-->>B: Menu Results
+    B->>DB: Vector Search
+    DB-->>B: Results
     B-->>V: Formatted Response
     V->>C: Voice Response
 ```
 
 ### Function Tools
 
-Four function tools map to content categories:
-
-- `get_menu_info` → `category: "menu"`
-- `get_modifiers_info` → `category: "modifiers"`
-- `get_hours_info` → `category: "hours"`
-- `get_zones_info` → `category: "zones"`
+| Tool | Category | Purpose |
+|------|----------|---------|
+| `get_menu_info` | menu | Menu items and descriptions |
+| `get_modifiers_info` | modifiers | Add-ons and extras |
+| `get_hours_info` | hours | Operating hours |
+| `get_zones_info` | zones | Delivery zones and fees |
 
 ### Tool Call Processing
 
-1. **Query Extraction**: Parse user query from Vapi request (supports multiple formats)
-2. **Restaurant ID Resolution**: Extract from header, query param, metadata, or phone lookup
-3. **Category Mapping**: Map tool name to content category
-4. **Vector Search**: Perform semantic search with restaurant_id filter
-5. **Response Formatting**: Return structured results with metadata for TTS enhancement
+1. Extract query from Vapi request
+2. Resolve `restaurant_id` (header/query/metadata/phone)
+3. Map tool name → category
+4. Vector search with `restaurant_id` filter
+5. Format response with metadata for TTS
 
 ## Vector Search Pipeline
 
 ### Embedding Generation
 
-Menu items, modifiers, hours, and zones are converted to embeddings:
-
-```python
-# Example: Menu item embedding
-content = f"{item['name']} - {item['description']} - ${item['price']}"
-embedding = await generate_embedding(content)  # OpenAI text-embedding-3-small
+```mermaid
+graph LR
+    A[Menu Item] --> B[Format Content]
+    B --> C[OpenAI Embedding API]
+    C --> D[1536-dim Vector]
+    D --> E[Store in pgvector]
+    
+    style C fill:#10b981
+    style E fill:#06b6d4
 ```
 
-Embeddings stored in `document_embeddings` table with:
+Content format: `"{name} - {description} - ${price}"`
 
-- `restaurant_id`: Tenant isolation
-- `category`: Content type (menu, modifiers, hours, zones)
-- `content`: Searchable text
-- `metadata`: Original record data (JSONB)
-- `embedding`: Vector (1536 dimensions)
+Stored in `document_embeddings`:
+- `restaurant_id`, `category`, `content`, `metadata` (JSONB), `embedding` (1536d)
 
 ### Search Flow
 
 ```mermaid
-graph LR
+graph TB
     A[User Query] --> B[Generate Embedding]
-    B --> C[Check Cache]
-    C -->|Hit| D[Return Cached]
-    C -->|Miss| E[pgvector Search]
-    E --> F[Filter by restaurant_id]
-    F --> G[Filter by category]
+    B --> C{Cache Hit?}
+    C -->|Yes| D[Return Cached]
+    C -->|No| E[pgvector Search]
+    E --> F[Filter restaurant_id]
+    F --> G[Filter category]
     G --> H[Top 5 Results]
-    H --> I[Cache Results]
+    H --> I[Cache 60s TTL]
     I --> J[Format Response]
-
+    
     style C fill:#f59e0b
     style E fill:#06b6d4
+    style I fill:#8b5cf6
 ```
 
 ### Search Function
 
-PostgreSQL function performs cosine similarity search:
+PostgreSQL function with HNSW index:
 
 ```sql
 CREATE FUNCTION search_documents(
@@ -171,88 +200,92 @@ CREATE FUNCTION search_documents(
     query_restaurant_id uuid,
     query_category text DEFAULT NULL,
     match_count int DEFAULT 5
-)
-RETURNS TABLE (content text, metadata jsonb, similarity float)
-```
+) RETURNS TABLE (content text, metadata jsonb, similarity float);
 
-Uses HNSW index for fast similarity search:
-
-```sql
 CREATE INDEX idx_document_embeddings_vector
-ON document_embeddings
-USING hnsw (embedding vector_cosine_ops);
+ON document_embeddings USING hnsw (embedding vector_cosine_ops);
 ```
 
 ## Call Management
 
-### Webhook Events
+### Webhook Events & Fallback
 
-Vapi.ai sends three webhook event types:
+```mermaid
+sequenceDiagram
+    participant V as Vapi.ai
+    participant B as Backend
+    participant T as Background Thread
+    participant DB as Database
+    
+    V->>B: assistant-request
+    V->>B: status-update (ringing)
+    B->>T: Schedule fetch (30s delay)
+    V->>B: status-update (in-progress)
+    V->>B: end-of-call-report (optional)
+    T->>V: Fetch call data (fallback)
+    V-->>T: Complete call data
+    T->>DB: Store call history
+```
 
-1. **assistant-request**: Maps phone number to restaurant_id
-2. **status-update**: Monitors call status (ringing, in-progress, ended)
-3. **end-of-call-report**: Triggers call data retrieval
+**Webhook Events**: `assistant-request`, `status-update`, `end-of-call-report`
 
-### Fallback Mechanism
-
-Webhooks are unreliable—final "ended" webhooks often don't arrive. System implements fallback:
-
-1. **Status Detection**: On "ringing" status, schedule API fetch after 30 seconds
-2. **Background Thread**: Daemon thread fetches call data from Vapi API
-3. **Duplicate Prevention**: Thread-safe tracking prevents duplicate fetches
-4. **Complete Data**: Ensures call transcripts, duration, cost are captured
+**Fallback**: Background thread fetches call data 30s after "ringing" status to ensure complete data capture.
 
 ### Call Data Storage
 
-Call history stored in `call_history` table:
-
-- `restaurant_id`: Tenant isolation
-- `started_at`, `ended_at`: Call timestamps
-- `duration_seconds`: Calculated duration
-- `caller`: Phone number (normalized)
-- `outcome`: Call outcome (completed, failed, etc.)
-- `messages`: Filtered transcript (user/assistant only)
-- `cost`: Total call cost
+`call_history` table: `restaurant_id`, `started_at`, `ended_at`, `duration_seconds`, `caller`, `outcome`, `messages` (filtered transcript), `cost`
 
 ## Caching Strategy
 
 ### Cache Architecture
 
-Two-tier caching with graceful fallback:
+```mermaid
+graph TB
+    A[Request] --> B{Cache Layer}
+    B -->|Primary| C[Redis]
+    B -->|Fallback| D[In-Memory TTLCache]
+    C --> E[Distributed Cache]
+    D --> F[Single Instance]
+    
+    style C fill:#ef4444
+    style D fill:#f59e0b
+```
 
-1. **Redis** (preferred): Distributed cache across server instances
-2. **In-Memory** (fallback): TTLCache for development/single-instance
+Two-tier: Redis (distributed) → In-Memory (fallback)
 
-### Cache Keys
+### Cache Keys & TTL
 
-- **Search Results**: `cache:{restaurant_id}:{category}:{query}`
-- **Call Mappings**: `call_phone:{call_id}`
-
-### Cache TTL
-
-- **Search Results**: 60 seconds (configurable via `CACHE_TTL_SECONDS`)
-- **Call Mappings**: 1 hour (fixed)
+| Key Pattern | TTL | Purpose |
+|------------|-----|---------|
+| `cache:{restaurant_id}:{category}:{query}` | 60s | Search results |
+| `call_phone:{call_id}` | 1h | Call mappings |
 
 ### Cache Invalidation
 
-Automatic invalidation on data changes:
-
-- Menu item update → Clear `cache:{restaurant_id}:menu:*`
+Automatic on data changes:
+- Menu update → Clear `cache:{restaurant_id}:menu:*`
 - Modifier update → Clear `cache:{restaurant_id}:modifiers:*`
 - Hours update → Clear `cache:{restaurant_id}:hours:*`
 - Zone update → Clear `cache:{restaurant_id}:zones:*`
 
 ## Middleware Stack
 
-FastAPI middleware applied in order:
+```mermaid
+graph TB
+    A[Incoming Request] --> B[RequestIDMiddleware]
+    B --> C[ValidationMiddleware]
+    C --> D[TimeoutMiddleware]
+    D --> E[AuthMiddleware]
+    E --> F[SlowAPIMiddleware]
+    F --> G[CORSMiddleware]
+    G --> H[SecurityHeadersMiddleware]
+    H --> I[Application Handler]
+    
+    style E fill:#f59e0b
+    style F fill:#ef4444
+```
 
-1. **RequestIDMiddleware**: Generates unique request IDs for tracing
-2. **ValidationMiddleware**: Validates request size and format
-3. **TimeoutMiddleware**: Global request timeout (30s default)
-4. **AuthMiddleware**: JWT validation for frontend, X-Vapi-Secret for webhooks
-5. **SlowAPIMiddleware**: Rate limiting (user-based and endpoint-based)
-6. **CORSMiddleware**: CORS configuration
-7. **SecurityHeadersMiddleware**: Security headers (CSP, HSTS, etc.)
+Applied in order: Request ID → Validation → Timeout (30s) → Auth (JWT/Secret) → Rate Limiting → CORS → Security Headers
 
 ## Frontend Architecture
 
@@ -260,176 +293,144 @@ FastAPI middleware applied in order:
 
 ```
 src/
-├── pages/           # Route pages (Dashboard, MenuBuilder, CallHistory)
-├── components/      # Reusable components
-│   ├── common/      # Shared components (Button, Modal, Toast)
-│   ├── layout/      # Layout components (Layout, Sidebar, Header)
-│   ├── menu/        # Menu-specific components
-│   └── dashboard/   # Dashboard-specific components
-├── features/        # Feature-specific hooks and utilities
-├── api/             # API client functions
-├── contexts/        # React contexts (Auth, Toast, Sidebar)
-└── hooks/           # Custom React hooks
+├── pages/          # Route pages
+├── components/     # Reusable components
+│   ├── common/     # Button, Modal, Toast
+│   ├── layout/     # Layout, Sidebar, Header
+│   ├── menu/       # Menu components
+│   └── dashboard/  # Dashboard components
+├── features/       # Feature hooks/utilities
+├── api/            # API client
+├── contexts/       # Auth, Toast, Sidebar
+└── hooks/          # Custom hooks
 ```
 
 ### State Management
 
-- **React Query**: Server state, caching, background refetching
-- **React Context**: Auth state, toast notifications, sidebar state
-- **Local State**: Component-specific state with `useState`
+- **React Query**: Server state, caching, background refetch
+- **React Context**: Auth, toast, sidebar state
+- **Local State**: Component-specific `useState`
 
 ### API Client
 
-Centralized API client with:
-
-- Base URL configuration
-- Request/response interceptors
-- Error handling
-- Authentication token injection
-- Request ID tracking
+Centralized client: base URL, interceptors, error handling, auth token injection, request ID tracking.
 
 ## Database Schema
 
 ### Core Tables
 
-- `restaurants`: Tenant table with API keys
-- `restaurant_phone_mappings`: Phone number → restaurant_id mapping
-- `categories`: Menu categories with display ordering
-- `menu_items`: Menu items with prices, descriptions, images
-- `modifiers`: Add-ons and extras
-- `menu_item_modifiers`: Many-to-many junction table
-- `operating_hours`: Day-of-week scheduling
-- `delivery_zones`: Geographic zones with fees
-- `document_embeddings`: Vector embeddings for semantic search
-- `call_history`: Call records with transcripts
+```mermaid
+erDiagram
+    RESTAURANTS ||--o{ RESTAURANT_PHONE_MAPPINGS : has
+    RESTAURANTS ||--o{ CATEGORIES : has
+    RESTAURANTS ||--o{ MENU_ITEMS : has
+    RESTAURANTS ||--o{ OPERATING_HOURS : has
+    RESTAURANTS ||--o{ DELIVERY_ZONES : has
+    RESTAURANTS ||--o{ DOCUMENT_EMBEDDINGS : has
+    RESTAURANTS ||--o{ CALL_HISTORY : has
+    CATEGORIES ||--o{ MENU_ITEMS : contains
+    MENU_ITEMS }o--o{ MODIFIERS : "has many"
+    MENU_ITEMS }o--o{ DOCUMENT_EMBEDDINGS : "embeds to"
+    
+    RESTAURANTS {
+        uuid id PK
+        string name
+        string api_key
+    }
+    MENU_ITEMS {
+        uuid id PK
+        uuid restaurant_id FK
+        uuid category_id FK
+        string name
+        decimal price
+    }
+    DOCUMENT_EMBEDDINGS {
+        uuid id PK
+        uuid restaurant_id FK
+        vector embedding
+        text category
+    }
+```
 
-### Indexes
+**Core Tables**: `restaurants`, `restaurant_phone_mappings`, `categories`, `menu_items`, `modifiers`, `menu_item_modifiers`, `operating_hours`, `delivery_zones`, `document_embeddings`, `call_history`
 
-- Restaurant-scoped indexes on all tenant tables
-- HNSW vector index on `document_embeddings.embedding`
-- Composite indexes for common query patterns
+**Indexes**: Restaurant-scoped indexes, HNSW vector index, composite indexes
 
-### Row-Level Security
-
-All tables have RLS enabled with policies:
-
-- **Service Role**: Full access (backend operations)
-- **Authenticated Users**: Read access (frontend queries)
-- **Anonymous**: No access (except public endpoints)
+**RLS**: All tables with policies (Service Role: full access, Authenticated: read, Anonymous: none)
 
 ## Security
 
 ### Authentication
 
+```mermaid
+graph LR
+    A[Request] --> B{Request Type}
+    B -->|Frontend| C[JWT Token]
+    B -->|Webhook| D[X-Vapi-Secret]
+    C --> E[Supabase Auth]
+    D --> F[Secret Validation]
+    
+    style C fill:#10b981
+    style D fill:#f59e0b
+```
+
 - **Frontend**: JWT tokens from Supabase Auth
 - **Webhooks**: X-Vapi-Secret header validation
-- **Dual Auth**: Separate auth paths for frontend and webhooks
 
-### Authorization
+### Authorization & Protection
 
 - **Tenant Isolation**: All queries filter by `restaurant_id`
 - **RLS Policies**: Database-level access control
-- **User-Restaurant Mapping**: Users associated with restaurants via `users` table
-
-### Data Protection
-
+- **Rate Limiting**: Per-user and per-endpoint
 - **Request Validation**: Size limits, format validation
-- **Rate Limiting**: Per-user and per-endpoint limits
-- **Timeout Protection**: Global request timeout
 - **Security Headers**: CSP, HSTS, X-Frame-Options
 
 ## Error Handling
 
 ### Exception Hierarchy
 
-Custom exceptions with appropriate HTTP status codes:
-
-- `NotFoundError` → 404
-- `AuthenticationError` → 401
-- `ValidationError` → 400
-- `VapiAPIError` → 502
-- `RestaurantVoiceAssistantError` → 500
+| Exception | Status Code |
+|-----------|-------------|
+| `NotFoundError` | 404 |
+| `AuthenticationError` | 401 |
+| `ValidationError` | 400 |
+| `VapiAPIError` | 502 |
+| `RestaurantVoiceAssistantError` | 500 |
 
 ### Error Tracking
 
-- **Sentry Integration**: Automatic error capture with context
-- **Request ID Tracking**: All errors include request ID for tracing
-- **User Context**: Sentry user context from JWT token
+Sentry integration with request ID tracking and user context from JWT.
 
 ## Performance Optimizations
 
-### Backend
+**Backend**: Async operations, connection pooling, background tasks, caching
 
-- **Async Operations**: FastAPI async/await for I/O-bound operations
-- **Connection Pooling**: Supabase client connection pooling
-- **Background Tasks**: Embedding generation in background
-- **Caching**: Redis/in-memory cache for search results
+**Frontend**: Code splitting, lazy loading, React Query caching, optimistic updates
 
-### Frontend
-
-- **Code Splitting**: Route-based code splitting with React Router
-- **Lazy Loading**: Dynamic imports for heavy components
-- **React Query**: Automatic background refetching and caching
-- **Optimistic Updates**: Immediate UI updates with rollback on error
-
-### Database
-
-- **Indexes**: Strategic indexes for common query patterns
-- **HNSW Index**: Fast vector similarity search
-- **Connection Pooling**: Supabase connection pooling
-- **Query Optimization**: Efficient queries with proper filtering
+**Database**: Strategic indexes, HNSW vector index, connection pooling, query optimization
 
 ## Deployment
 
-### Backend (Railway)
-
-- **Runtime**: Python 3.12
-- **Process**: Uvicorn ASGI server
-- **Environment Variables**: Loaded from Railway secrets
-- **Health Checks**: `/api/health` endpoint
-
-### Frontend (Vercel)
-
-- **Build**: Vite production build
-- **Static Assets**: CDN-hosted assets
-- **Environment Variables**: Vercel environment variables
-- **Routing**: Client-side routing with React Router
-
-### Database (Supabase)
-
-- **PostgreSQL**: Managed PostgreSQL with pgvector
-- **Migrations**: SQL migration files applied in order
-- **Backups**: Automatic daily backups
-- **Monitoring**: Supabase dashboard for query performance
+| Service | Platform | Details |
+|---------|----------|---------|
+| Backend | Railway | Python 3.12, Uvicorn, `/api/health` endpoint |
+| Frontend | Vercel | Vite build, CDN assets, client-side routing |
+| Database | Supabase | PostgreSQL + pgvector, SQL migrations, daily backups |
 
 ## Monitoring & Observability
 
-### Error Tracking
+**Error Tracking**: Sentry with stack traces, user context, request context, environment tagging
 
-- **Sentry**: Error capture with stack traces, user context, request context
-- **Error Filtering**: Common non-critical errors filtered out
-- **Environment Tagging**: Errors tagged with environment (development/production)
+**Logging**: Structured JSON logs with request IDs, log levels (DEBUG/INFO/WARNING/ERROR)
 
-### Logging
-
-- **Structured Logging**: JSON-formatted logs with request IDs
-- **Log Levels**: DEBUG, INFO, WARNING, ERROR
-- **Request Tracing**: Request IDs propagated through all layers
-
-### Health Checks
-
-- **Backend Health**: `/api/health` endpoint with database connectivity check
-- **Frontend Health**: Vercel deployment status
-- **Database Health**: Supabase connection status
+**Health Checks**: Backend `/api/health` (DB connectivity), Frontend (Vercel status), Database (Supabase status)
 
 ## Future Enhancements
 
-Potential improvements:
-
-1. **Real-Time Updates**: WebSocket support for live call monitoring
-2. **Analytics Dashboard**: Call analytics, query patterns, performance metrics
-3. **Multi-Language Support**: Internationalization for voice assistant
-4. **Order Integration**: Connect to POS systems for order placement
-5. **Advanced Analytics**: Query intent analysis, customer sentiment
-6. **A/B Testing**: Test different prompts and responses
-7. **Custom Voices**: Restaurant-specific voice customization
+1. Real-time updates via WebSocket for live call monitoring
+2. Analytics dashboard with call analytics and query patterns
+3. Multi-language support for voice assistant
+4. Order integration with POS systems
+5. Advanced analytics: intent analysis, sentiment
+6. A/B testing for prompts and responses
+7. Custom voices per restaurant
