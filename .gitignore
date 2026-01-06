@@ -219,6 +219,8 @@ supabase/.temp/
 
 # Tools binaries
 tools/bin/
+**/tools/bin/
+backend_2/tools/bin/
 *.exe
 
 # ============================================================================
@@ -245,3 +247,7 @@ dist/stats.html
 *.rej
 *.patch
 
+.gitignore
+
+.mypy_cache/
+.ruff_cache/
