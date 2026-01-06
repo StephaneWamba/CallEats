@@ -219,7 +219,6 @@ Use `scripts/setup_vapi.py` to configure Vapi.ai assistant with function tools a
 
 - [Architecture Documentation](./docs/architecture.md)
 - [API Reference](./docs/api.md)
-- [Writing Rules](./docs/WRITING_RULES.md)
 
 ---
 
