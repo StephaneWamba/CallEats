@@ -2,6 +2,35 @@
 
 Multi-tenant voice assistant system for restaurants using Vapi.ai, semantic search, and real-time call management.
 
+## Screenshots
+
+<div align="center">
+
+<table>
+<tr>
+<td width="50%" align="center">
+<strong>Hero / Overview</strong><br/>
+<img src="frontend/public/hero.png" alt="CallEats Hero" width="100%"/>
+</td>
+<td width="50%" align="center">
+<strong>Dashboard with Call History</strong><br/>
+<img src="frontend/public/calleats.png" alt="CallEats Dashboard" width="100%"/>
+</td>
+</tr>
+<tr>
+<td width="50%" align="center">
+<strong>Menu Management Interface</strong><br/>
+<img src="frontend/public/menu_builder.png" alt="Menu Builder" width="100%"/>
+</td>
+<td width="50%" align="center">
+<strong>Delivery Zones Configuration</strong><br/>
+<img src="frontend/public/zones.png" alt="Delivery Zones" width="100%"/>
+</td>
+</tr>
+</table>
+
+</div>
+
 ## Overview
 
 AI-powered voice assistant for restaurants that automates phone inquiries using Vapi.ai and semantic search. Handles menu questions, hours, delivery zones, and availability through natural conversation.
