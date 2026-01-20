@@ -211,6 +211,66 @@ export const LandingPage = () => {
                   </div>
                 </div>
               </div>
+
+              {/* Menu Builder Image Third */}
+              <div className="relative mx-auto w-full max-w-6xl">
+                <div className="relative overflow-hidden rounded-xl border-4 border-gray-800 bg-gray-800 shadow-2xl sm:rounded-2xl">
+                  {/* Browser Chrome */}
+                  <div className="flex h-10 items-center gap-2 bg-gray-700 px-3 sm:h-12 sm:px-4">
+                    {/* Traffic Lights / Window Controls */}
+                    <div className="flex gap-1.5 sm:gap-2">
+                      <div className="h-2.5 w-2.5 rounded-full bg-red-500 sm:h-3 sm:w-3" />
+                      <div className="h-2.5 w-2.5 rounded-full bg-yellow-500 sm:h-3 sm:w-3" />
+                      <div className="h-2.5 w-2.5 rounded-full bg-green-500 sm:h-3 sm:w-3" />
+                    </div>
+                    {/* Address Bar */}
+                    <div className="ml-2 flex flex-1 items-center gap-2 rounded-md bg-gray-600 px-3 py-1 sm:ml-4 sm:px-4 sm:py-1.5">
+                      <div className="h-1.5 w-1.5 rounded-full bg-gray-400 sm:h-2 sm:w-2" />
+                      <div className="h-1.5 flex-1 rounded bg-gray-500/50 sm:h-2" />
+                    </div>
+                  </div>
+                  
+                  {/* Screen Content - Menu Builder Image */}
+                  <div className="relative bg-white">
+                    <img
+                      src="/menu_builder.png"
+                      alt="CallEats Menu Builder - Manage menu items, categories, and modifiers"
+                      className="w-full h-auto object-contain"
+                      loading="lazy"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* Delivery Zones Image Fourth */}
+              <div className="relative mx-auto w-full max-w-6xl">
+                <div className="relative overflow-hidden rounded-xl border-4 border-gray-800 bg-gray-800 shadow-2xl sm:rounded-2xl">
+                  {/* Browser Chrome */}
+                  <div className="flex h-10 items-center gap-2 bg-gray-700 px-3 sm:h-12 sm:px-4">
+                    {/* Traffic Lights / Window Controls */}
+                    <div className="flex gap-1.5 sm:gap-2">
+                      <div className="h-2.5 w-2.5 rounded-full bg-red-500 sm:h-3 sm:w-3" />
+                      <div className="h-2.5 w-2.5 rounded-full bg-yellow-500 sm:h-3 sm:w-3" />
+                      <div className="h-2.5 w-2.5 rounded-full bg-green-500 sm:h-3 sm:w-3" />
+                    </div>
+                    {/* Address Bar */}
+                    <div className="ml-2 flex flex-1 items-center gap-2 rounded-md bg-gray-600 px-3 py-1 sm:ml-4 sm:px-4 sm:py-1.5">
+                      <div className="h-1.5 w-1.5 rounded-full bg-gray-400 sm:h-2 sm:w-2" />
+                      <div className="h-1.5 flex-1 rounded bg-gray-500/50 sm:h-2" />
+                    </div>
+                  </div>
+                  
+                  {/* Screen Content - Delivery Zones Image */}
+                  <div className="relative bg-white">
+                    <img
+                      src="/zones.png"
+                      alt="CallEats Delivery Zones - Configure delivery areas with interactive maps"
+                      className="w-full h-auto object-contain"
+                      loading="lazy"
+                    />
+                  </div>
+                </div>
+              </div>
               
               {/* Glow Effect */}
               <div className="absolute -inset-4 -z-10 rounded-2xl bg-linear-to-br from-primary/20 via-secondary/20 to-primary/20 blur-2xl opacity-75" />
