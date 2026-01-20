@@ -1,6 +1,5 @@
 import { Link } from 'react-router-dom';
 import { Button } from '@/components/common/Button';
-import { PhoneMockup } from '@/components/common/PhoneMockup';
 import { DecorativeBlobs } from '@/components/common/DecorativeBlobs';
 import { useScrollReveal } from '@/hooks/useScrollReveal';
 import { ROUTES } from '@/config/routes';
@@ -150,53 +149,71 @@ export const LandingPage = () => {
               </div>
             </div>
 
-            <div className="relative">
+            <div className="relative space-y-6">
               <div className="absolute inset-0 -translate-y-12 translate-x-12 rounded-3xl bg-linear-to-br from-primary/20 to-secondary/20 blur-3xl" />
-              <PhoneMockup>
-                <div className="p-4">
-                  <div className="mb-4 flex items-center justify-between">
-                    <div>
-                      <p className="text-xs text-gray-500">Incoming call</p>
-                      <p className="text-base font-semibold text-gray-900">+1 (415) 555-2039</p>
+              
+              {/* Hero Image First */}
+              <div className="relative mx-auto w-full max-w-6xl">
+                <div className="relative overflow-hidden rounded-xl border-4 border-gray-800 bg-gray-800 shadow-2xl sm:rounded-2xl">
+                  {/* Browser Chrome */}
+                  <div className="flex h-10 items-center gap-2 bg-gray-700 px-3 sm:h-12 sm:px-4">
+                    {/* Traffic Lights / Window Controls */}
+                    <div className="flex gap-1.5 sm:gap-2">
+                      <div className="h-2.5 w-2.5 rounded-full bg-red-500 sm:h-3 sm:w-3" />
+                      <div className="h-2.5 w-2.5 rounded-full bg-yellow-500 sm:h-3 sm:w-3" />
+                      <div className="h-2.5 w-2.5 rounded-full bg-green-500 sm:h-3 sm:w-3" />
                     </div>
-                    <span className="rounded-full bg-success/10 px-2.5 py-1 text-xs font-medium text-success">AI Active</span>
+                    {/* Address Bar */}
+                    <div className="ml-2 flex flex-1 items-center gap-2 rounded-md bg-gray-600 px-3 py-1 sm:ml-4 sm:px-4 sm:py-1.5">
+                      <div className="h-1.5 w-1.5 rounded-full bg-gray-400 sm:h-2 sm:w-2" />
+                      <div className="h-1.5 flex-1 rounded bg-gray-500/50 sm:h-2" />
+                    </div>
                   </div>
-                  <div className="space-y-3 text-xs">
-                    <div className="flex">
-                      <div className="inline-flex max-w-[75%] items-start gap-1.5 rounded-2xl rounded-tl-sm bg-primary/10 px-3 py-2 text-primary">
-                        <span className="font-semibold">Guest:</span>
-                        <p>Do you have any gluten-free pasta options tonight?</p>
-                      </div>
-                    </div>
-                    <div className="flex justify-end">
-                      <div className="inline-flex max-w-[75%] items-start gap-1.5 rounded-2xl rounded-tr-sm bg-secondary/10 px-3 py-2 text-secondary">
-                        <span className="font-semibold">AI:</span>
-                        <p>
-                          Absolutely! We recommend the Truffle Mushroom Linguine — it's gluten-free and ready in 12 minutes.
-                        </p>
-                      </div>
-                    </div>
-                    <div className="flex">
-                      <div className="inline-flex max-w-[75%] items-start gap-1.5 rounded-2xl rounded-tl-sm bg-primary/10 px-3 py-2 text-primary">
-                        <span className="font-semibold">Guest:</span>
-                        <p>Perfect. Can I schedule pickup for 7:15?</p>
-                      </div>
-                    </div>
-                    <div className="flex justify-end">
-                      <div className="inline-flex max-w-[75%] items-start gap-1.5 rounded-2xl rounded-tr-sm bg-secondary/10 px-3 py-2 text-secondary">
-                        <span className="font-semibold">AI:</span>
-                        <p>Done! We'll have it hot and ready at 7:15 PM. Anything else I can add for you?</p>
-                      </div>
-                    </div>
-                    <div className="flex">
-                      <div className="inline-flex max-w-[75%] items-start gap-1.5 rounded-2xl rounded-tl-sm bg-primary/10 px-3 py-2 text-primary">
-                        <span className="font-semibold">Guest:</span>
-                        <p>That's perfect, thank you!</p>
-                      </div>
-                    </div>
+                  
+                  {/* Screen Content - Hero Image */}
+                  <div className="relative bg-white">
+                    <img
+                      src="/hero.png"
+                      alt="CallEats Hero - AI voice assistant for restaurants"
+                      className="w-full h-auto object-contain"
+                      loading="lazy"
+                    />
                   </div>
                 </div>
-              </PhoneMockup>
+              </div>
+
+              {/* Dashboard Image Second */}
+              <div className="relative mx-auto w-full max-w-6xl">
+                <div className="relative overflow-hidden rounded-xl border-4 border-gray-800 bg-gray-800 shadow-2xl sm:rounded-2xl">
+                  {/* Browser Chrome */}
+                  <div className="flex h-10 items-center gap-2 bg-gray-700 px-3 sm:h-12 sm:px-4">
+                    {/* Traffic Lights / Window Controls */}
+                    <div className="flex gap-1.5 sm:gap-2">
+                      <div className="h-2.5 w-2.5 rounded-full bg-red-500 sm:h-3 sm:w-3" />
+                      <div className="h-2.5 w-2.5 rounded-full bg-yellow-500 sm:h-3 sm:w-3" />
+                      <div className="h-2.5 w-2.5 rounded-full bg-green-500 sm:h-3 sm:w-3" />
+                    </div>
+                    {/* Address Bar */}
+                    <div className="ml-2 flex flex-1 items-center gap-2 rounded-md bg-gray-600 px-3 py-1 sm:ml-4 sm:px-4 sm:py-1.5">
+                      <div className="h-1.5 w-1.5 rounded-full bg-gray-400 sm:h-2 sm:w-2" />
+                      <div className="h-1.5 flex-1 rounded bg-gray-500/50 sm:h-2" />
+                    </div>
+                  </div>
+                  
+                  {/* Screen Content - Dashboard Image */}
+                  <div className="relative bg-white">
+                    <img
+                      src="/calleats.png"
+                      alt="CallEats Dashboard - AI-powered restaurant voice assistant with call history, menu management, and real-time analytics"
+                      className="w-full h-auto object-contain"
+                      loading="lazy"
+                    />
+                  </div>
+                </div>
+              </div>
+              
+              {/* Glow Effect */}
+              <div className="absolute -inset-4 -z-10 rounded-2xl bg-linear-to-br from-primary/20 via-secondary/20 to-primary/20 blur-2xl opacity-75" />
             </div>
           </div>
         </section>
