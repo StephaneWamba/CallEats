@@ -169,7 +169,7 @@ export const LandingPage = () => {
                       <div className="h-1.5 flex-1 rounded bg-gray-500/50 sm:h-2" />
                     </div>
                   </div>
-                  
+
                   {/* Screen Content */}
                   <div className="relative bg-white">
                     <img
@@ -180,7 +180,7 @@ export const LandingPage = () => {
                     />
                   </div>
                 </div>
-                
+
                 {/* Glow Effect */}
                 <div className="absolute -inset-4 -z-10 rounded-2xl bg-linear-to-br from-primary/20 via-secondary/20 to-primary/20 blur-2xl opacity-75" />
               </div>
@@ -225,7 +225,7 @@ export const LandingPage = () => {
               '-left-8 -bottom-8'   // bottom-left
             ];
             return (
-              <div 
+              <div
                 key={feature.title}
                 className={`group relative flex h-full flex-col overflow-hidden rounded-2xl border border-gray-200 bg-white p-6 shadow-md transition-all duration-300 hover:-translate-y-2 hover:shadow-2xl hover:border-primary/30 reveal-slide-up ${delays[index]}`}
               >

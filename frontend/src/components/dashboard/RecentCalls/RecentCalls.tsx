@@ -103,13 +103,12 @@ const ExpandedCall: React.FC<ExpandedCallProps> = ({ callId, restaurantId }) => 
             {call.messages.map((message, index) => (
               <div
                 key={index}
-                className={`rounded-lg p-2.5 text-xs ${
-                  message.role === 'user'
+                className={`rounded-lg p-2.5 text-xs ${message.role === 'user'
                     ? 'bg-primary/10 ml-4'
                     : message.role === 'assistant'
                       ? 'bg-white mr-4 border border-gray-200'
                       : 'bg-gray-100'
-                }`}
+                  }`}
               >
                 <div className="mb-1 flex items-center justify-between">
                   <span className="font-medium text-gray-700 capitalize">{message.role}</span>

@@ -110,13 +110,12 @@ export const CallDetails: React.FC<CallDetailsProps> = ({ call }) => {
             {call.messages.map((message, index) => (
               <div
                 key={index}
-                className={`rounded-lg p-3 ${
-                  message.role === 'user'
+                className={`rounded-lg p-3 ${message.role === 'user'
                     ? 'bg-primary/10 ml-8'
                     : message.role === 'assistant'
                       ? 'bg-gray-100 mr-8'
                       : 'bg-gray-50'
-                }`}
+                  }`}
               >
                 <div className="mb-1 flex items-center justify-between">
                   <span className="text-xs font-medium text-gray-600 capitalize">
