@@ -1,0 +1,187 @@
+"""OpenAI embeddings service.
+
+This module provides functionality for generating embeddings using OpenAI's API.
+It handles embedding generation for restaurant data including menu items,
+modifiers, operating hours, and delivery zones.
+
+Key Features:
+    - Async embedding generation using OpenAI API
+    - Batch processing for multiple documents
+    - Background task support for non-blocking operations
+    - Automatic embedding storage in Supabase
+
+Embedding Model:
+    Default: text-embedding-3-small (1536 dimensions)
+    Configurable via EMBEDDING_MODEL environment variable
+
+Usage:
+    from restaurant_voice_assistant.infrastructure.openai.embeddings import (
+        generate_embedding,
+        generate_embeddings_for_restaurant
+    )
+    
+    # Generate single embedding
+    embedding = await generate_embedding("Menu item text")
+    
+    # Generate all embeddings for restaurant
+    result = await generate_embeddings_for_restaurant(
+        restaurant_id="...",
+        category="menu"  # Optional: menu, modifiers, hours, zones
+    )
+"""
+from openai import AsyncOpenAI
+from restaurant_voice_assistant.core.config import get_settings
+from restaurant_voice_assistant.infrastructure.database.client import (
+    get_supabase_client,
+    get_supabase_service_client
+)
+from restaurant_voice_assistant.infrastructure.retry import retry_with_backoff
+from typing import Optional
+import logging
+
+settings = get_settings()
+openai_client = AsyncOpenAI(api_key=settings.openai_api_key)
+logger = logging.getLogger(__name__)
+
+
+@retry_with_backoff
+async def generate_embedding(text: str) -> list[float]:
+    """Generate embedding for a text using OpenAI with retry logic."""
+    response = await openai_client.embeddings.create(
+        model=settings.embedding_model,
+        input=text
+    )
+    return response.data[0].embedding
+
+
+async def generate_embeddings_for_restaurant(
+    restaurant_id: str,
+    category: Optional[str] = None
+) -> dict:
+    """Generate embeddings for all documents of a restaurant.
+
+    Args:
+        restaurant_id: UUID of the restaurant
+        category: Optional category filter (menu, modifiers, hours, zones)
+
+    Returns:
+        dict with count of generated embeddings
+    """
+    supabase_read = get_supabase_client()
+    supabase_write = get_supabase_service_client()
+
+    categories_to_process = [category] if category else [
+        "menu", "modifiers", "hours", "zones"]
+    total_generated = 0
+
+    for cat in categories_to_process:
+        if cat == "menu":
+            data = supabase_read.table("menu_items").select(
+                "*").eq("restaurant_id", restaurant_id).execute()
+            documents = [
+                {
+                    "content": f"{item['name']} - {item['description']} - ${item['price']}",
+                    "metadata": item,
+                    "category": "menu"
+                }
+                for item in data.data
+            ]
+        elif cat == "modifiers":
+            data = supabase_read.table("modifiers").select(
+                "*").eq("restaurant_id", restaurant_id).execute()
+            documents = [
+                {
+                    "content": f"{mod['name']} - {mod.get('description', '')} - ${mod.get('price', 0)}",
+                    "metadata": mod,
+                    "category": "modifiers"
+                }
+                for mod in data.data
+            ]
+        elif cat == "hours":
+            data = supabase_read.table("operating_hours").select(
+                "*").eq("restaurant_id", restaurant_id).execute()
+            documents = [
+                {
+                    "content": f"{h['day_of_week']}: {h['open_time']} - {h['close_time']}",
+                    "metadata": h,
+                    "category": "hours"
+                }
+                for h in data.data
+            ]
+        elif cat == "zones":
+            data = supabase_read.table("delivery_zones").select(
+                "*").eq("restaurant_id", restaurant_id).execute()
+            documents = [
+                {
+                    "content": f"Delivery zone {z.get('zone_name')}: €{z.get('delivery_fee') if z.get('delivery_fee') is not None else 0}",
+                    "metadata": z,
+                    "category": "zones"
+                }
+                for z in data.data
+            ]
+        else:
+            continue
+
+        for doc in documents:
+            embedding = await generate_embedding(doc["content"])
+
+            supabase_write.table("document_embeddings").upsert({
+                "restaurant_id": restaurant_id,
+                "content": doc["content"],
+                "embedding": embedding,
+                "category": doc["category"],
+                "metadata": doc["metadata"]
+            }).execute()
+
+            total_generated += 1
+
+    return {
+        "status": "success",
+        "restaurant_id": restaurant_id,
+        "embeddings_generated": total_generated
+    }
+
+
+async def trigger_embedding_generation(
+    restaurant_id: str,
+    category: str
+) -> None:
+    """Trigger embedding generation in background.
+
+    This function is designed to be called as a background task.
+    Errors are logged but do not propagate to avoid affecting the main request.
+
+    Args:
+        restaurant_id: Restaurant UUID
+        category: Category to regenerate (menu, modifiers, hours, zones)
+    """
+    try:
+        result = await generate_embeddings_for_restaurant(
+            restaurant_id=restaurant_id,
+            category=category
+        )
+    except Exception as e:
+        logger.error(
+            f"Background embedding generation failed for restaurant {restaurant_id}, "
+            f"category {category}: {e}",
+            exc_info=True
+        )
+
+
+def add_embedding_task(
+    background_tasks,
+    restaurant_id: str,
+    category: str
+) -> None:
+    """Add embedding generation as a background task.
+
+    Args:
+        background_tasks: FastAPI BackgroundTasks instance
+        restaurant_id: Restaurant UUID
+        category: Category to regenerate
+    """
+    background_tasks.add_task(
+        trigger_embedding_generation,
+        restaurant_id=restaurant_id,
+        category=category
+    )

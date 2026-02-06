@@ -186,8 +186,7 @@ temp/
 # ============================================================================
 # Backend Specific
 # ============================================================================
-# Old backend folder (if exists)
-backend/
+# Note: backend/ folder is now tracked (removed from ignore)
 
 # Development/Testing Scripts (not needed for cloning)
 # Test scripts (contain hardcoded credentials/test data)

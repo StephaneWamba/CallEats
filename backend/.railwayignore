@@ -1,0 +1,53 @@
+# Railway ignore file
+# Files and directories to exclude from Railway deployment
+
+# Development files
+.env
+.env.local
+.env.*.local
+*.log
+*.pyc
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Testing
+.pytest_cache/
+.coverage
+htmlcov/
+*.cover
+
+# Documentation
+*.md
+!README.md
+RAILWAY.md
+
+# Old backend (if exists)
+backend_2/backend/
+
+# Scripts (if not needed in production)
+scripts/
+*.sh
+
+# Docker (if not using Docker deployment)
+Dockerfile
+docker-compose.yml
+.dockerignore
+
+# Git
+.git/
+.gitignore
+
+# OS
+.DS_Store
+Thumbs.db
+
